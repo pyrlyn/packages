@@ -1,0 +1,6 @@
+# Versions shared by consumers. Consumers keep declaring the Kotlin plugin themselves (same version).
+[versions]
+kotlin = "2.4.21"
+
+[libraries]
+kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
