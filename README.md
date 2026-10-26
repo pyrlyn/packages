@@ -41,3 +41,12 @@ or `org.jetbrains.kotlin.jvm` (can also be applied directly per module). Uses `o
 - Every test task (`AbstractTestTask`: K/N test runs, `jvmTest`, `allTests`, custom `KotlinNativeHostTest`
   tasks) depends on the module's `ktlintCheck`, so style errors fail before tests, locally and in CI.
 - Files under `build/` and `generated/` are excluded. Rule tweaks go in the consumer's `.editorconfig`.
+
+## ci.diffuser.cstatic
+
+Per-module plugin: compiles `src/nativeInterop/c/<name>.c` into `build/native/macosArm64/lib<name>.a` (xcrun clang, macOS arm64) and links it via cinterop `staticLibraries`:
+
+```kotlin
+plugins { id("ci.diffuser.cstatic") }
+configure<ci.diffuser.CStaticExtension> { library(name = "rtok_spawn", cinterop = "spawn") }
+```

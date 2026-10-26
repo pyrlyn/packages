@@ -35,6 +35,11 @@ gradlePlugin {
             implementationClass = "ci.diffuser.DetektConventionPlugin"
             description = "detekt static analysis with the shared ci-diffuser config; detekt runs before every test task"
         }
+        register("cstatic") {
+            id = "ci.diffuser.cstatic"
+            implementationClass = "ci.diffuser.CStaticConventionPlugin"
+            description = "Compile a module's own C helpers into a static library linked via cinterop staticLibraries"
+        }
         register("ktlint") {
             id = "ci.diffuser.ktlint"
             implementationClass = "ci.diffuser.KtlintConventionPlugin"
