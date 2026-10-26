@@ -29,3 +29,15 @@ Release options apply to RELEASE non-test binaries only; debug and test binaries
 Versions live in `gradle/libs.versions.toml`; KGP is `compileOnly`, the consumer's Kotlin plugin is used at runtime.
 
 Rename: `rootProject.name`, plugin id in `build.gradle.kts`, package `ci.diffuser`.
+
+## `ci.diffuser.ktlint`
+
+Applied automatically by `ci.diffuser.native` to every subproject with `org.jetbrains.kotlin.multiplatform`
+or `org.jetbrains.kotlin.jvm` (can also be applied directly per module). Uses `org.jlleitschuh.gradle.ktlint`
+(version in `gradle/libs.versions.toml`, ktlint engine pinned there too).
+
+- `./gradlew ktlintCheck`: lint; part of `check`.
+- `./gradlew ktlintFormat`: auto-format.
+- Every test task (`AbstractTestTask`: K/N test runs, `jvmTest`, `allTests`, custom `KotlinNativeHostTest`
+  tasks) depends on the module's `ktlintCheck`, so style errors fail before tests, locally and in CI.
+- Files under `build/` and `generated/` are excluded. Rule tweaks go in the consumer's `.editorconfig`.
