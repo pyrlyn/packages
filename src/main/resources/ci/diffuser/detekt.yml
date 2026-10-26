@@ -1,0 +1,11 @@
+# Shared ci-diffuser detekt config, applied on top of detekt's default config (buildUponDefaultConfig).
+# Formatting is ktlint's job: detekt-formatting (ktlint wrapper) is not added.
+# Consumers override by adding config/detekt/detekt.yml in their root project (merged after this file).
+config:
+  validation: true
+# Owned by ktlint (max-line-length, no-wildcard-imports); off here to avoid double reporting.
+style:
+  MaxLineLength:
+    active: false
+  WildcardImport:
+    active: false

@@ -16,7 +16,7 @@ import org.jetbrains.kotlin.konan.target.Family
  * - `allTargets=true`       add linuxX64 and linuxArm64 next to macosArm64.
  * - `releaseSize=none|all|small,latin1,strip`  release-only size options (default `none`).
  * - `release.fast=true`     K/N release binary cache: fast release links, no whole-program LTO. Never ship.
- * Every Kotlin module (multiplatform or jvm) also gets [KtlintConventionPlugin].
+ * Every Kotlin module (multiplatform or jvm) also gets [KtlintConventionPlugin] and [DetektConventionPlugin].
  * Release link tasks never enter the build cache. Debug and test binaries are untouched.
  */
 class NativeConventionPlugin : Plugin<Project> {
@@ -34,7 +34,10 @@ class NativeConventionPlugin : Plugin<Project> {
             // KGP reads this before it configures native link tasks, so set it before the plugin is applied.
             if (releaseFast) p.extensions.extraProperties["kotlin.internal.native.enableReleaseBinaryCache"] = "true"
             for (kotlinPlugin in listOf("org.jetbrains.kotlin.multiplatform", "org.jetbrains.kotlin.jvm")) {
-                p.pluginManager.withPlugin(kotlinPlugin) { p.pluginManager.apply(KtlintConventionPlugin::class.java) }
+                p.pluginManager.withPlugin(kotlinPlugin) {
+                    p.pluginManager.apply(KtlintConventionPlugin::class.java)
+                    p.pluginManager.apply(DetektConventionPlugin::class.java)
+                }
             }
             p.pluginManager.withPlugin("org.jetbrains.kotlin.multiplatform") {
                 p.tasks.matching { it.name.startsWith("linkRelease") }.configureEach {

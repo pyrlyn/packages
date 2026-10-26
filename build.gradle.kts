@@ -4,6 +4,7 @@ dependencies {
     // compileOnly: the consumer's own Kotlin plugin (same version) is used at runtime.
     compileOnly(libs.kotlin.gradle.plugin)
     implementation(libs.ktlint.gradle.plugin)
+    implementation(libs.detekt.gradle.plugin)
 }
 
 // The ktlint engine version reaches the plugin code as a generated constant.
@@ -28,6 +29,11 @@ gradlePlugin {
             id = "ci.diffuser.native"
             implementationClass = "ci.diffuser.NativeConventionPlugin"
             description = "Kotlin/Native dev and release build settings for every subproject using Kotlin Multiplatform"
+        }
+        register("detekt") {
+            id = "ci.diffuser.detekt"
+            implementationClass = "ci.diffuser.DetektConventionPlugin"
+            description = "detekt static analysis with the shared ci-diffuser config; detekt runs before every test task"
         }
         register("ktlint") {
             id = "ci.diffuser.ktlint"
