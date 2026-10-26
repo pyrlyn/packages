@@ -92,3 +92,20 @@ fun guestSlice(
     }
     return data.copyOfRange(offset, offset + length)
 }
+
+/** Splits a packed guest `(ptr, len)`: the pointer in the low 32 bits, the length in the high 32. */
+fun unpackI64(packed: Long): Pair<Int, Int> = packed.toInt() to (packed ushr Int.SIZE_BITS).toInt()
+
+/**
+ * Reads the bytes a guest export returned as a packed `(ptr, len)`. Both halves come from the
+ * guest, so a length over [maxLength], a missing memory or a range outside it throws [WasmException].
+ */
+fun readPacked(
+    memory: WasmMemory?,
+    packed: Long,
+    maxLength: Int = Int.MAX_VALUE,
+): ByteArray {
+    val (ptr, len) = unpackI64(packed)
+    if (len < 0 || len > maxLength) throw WasmException("guest returned $len bytes, more than $maxLength")
+    return (memory ?: throw WasmException("guest memory export missing")).read(ptr, len)
+}
