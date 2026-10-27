@@ -1,0 +1,7 @@
+# The C codecs :archive links statically. Versions here, recipe revisions in conan.lock.
+[requires]
+bzip2/1.0.8
+xz_utils/5.8.4
+
+[options]
+*:shared=False

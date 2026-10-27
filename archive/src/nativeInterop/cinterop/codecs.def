@@ -1,0 +1,4 @@
+# bzip2 and liblzma from Conan; the build script adds their include directories and static libraries.
+headers = bzlib.h lzma.h
+headerFilter = bzlib.h lzma.h lzma/*
+package = archive.codecs
