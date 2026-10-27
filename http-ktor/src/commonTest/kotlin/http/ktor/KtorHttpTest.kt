@@ -62,6 +62,19 @@ class KtorHttpTest {
             assertEquals("rtok/t", seen.headers["User-Agent"])
         }
 
+    @Test fun aPutAndAPatchSendTheirMethodAndBody() =
+        runBlocking {
+            val seen = mutableListOf<Pair<HttpMethod, String>>()
+            client { req ->
+                seen += req.method to (req.body as io.ktor.http.content.OutgoingContent.ByteArrayContent).bytes().decodeToString()
+                respond("{}", HttpStatusCode.OK)
+            }.use { c ->
+                assertEquals(200, c.put(HttpRequest("http://x/contents/a", body = "put".encodeToByteArray())).status)
+                assertEquals(200, c.patch(HttpRequest("http://x/refs/heads/b", body = "patch".encodeToByteArray())).status)
+            }
+            assertEquals(listOf(HttpMethod.Put to "put", HttpMethod.Patch to "patch"), seen)
+        }
+
     @Test fun aNonSuccessStatusIsAResponseNotAnException() =
         runBlocking {
             client { respond("overloaded", HttpStatusCode.ServiceUnavailable) }.use { c ->

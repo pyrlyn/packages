@@ -15,11 +15,12 @@ import io.ktor.client.network.sockets.SocketTimeoutException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
-import io.ktor.client.request.post
 import io.ktor.client.request.prepareGet
+import io.ktor.client.request.request
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsBytes
 import io.ktor.client.statement.bodyAsChannel
+import io.ktor.http.HttpMethod
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CancellationException
 import io.ktor.client.HttpClient as Ktor
@@ -47,9 +48,19 @@ class KtorHttp(
             }
         }
 
-    override suspend fun post(req: HttpRequest): HttpResponse =
+    override suspend fun post(req: HttpRequest): HttpResponse = withBody(req, HttpMethod.Post)
+
+    override suspend fun put(req: HttpRequest): HttpResponse = withBody(req, HttpMethod.Put)
+
+    override suspend fun patch(req: HttpRequest): HttpResponse = withBody(req, HttpMethod.Patch)
+
+    private suspend fun withBody(
+        req: HttpRequest,
+        verb: HttpMethod,
+    ): HttpResponse =
         send(req) {
-            client.post(req.url) {
+            client.request(req.url) {
+                method = verb
                 // Raw headers: Ktor must not merge or re-case what the caller set (auth included).
                 req.headers.forEach { (k, v) -> headers.append(k, v) }
                 setBody(req.body)

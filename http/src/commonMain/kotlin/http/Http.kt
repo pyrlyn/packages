@@ -57,6 +57,12 @@ interface HttpClient : AutoCloseable {
     /** GET [req] (its body is ignored); errors as for [post]. */
     suspend fun get(req: HttpRequest): HttpResponse = throw HttpException(HttpException.Kind.Io, "GET is not supported by this client")
 
+    /** PUT [req]; errors as for [post]. */
+    suspend fun put(req: HttpRequest): HttpResponse = throw HttpException(HttpException.Kind.Io, "PUT is not supported by this client")
+
+    /** PATCH [req]; errors as for [post]. */
+    suspend fun patch(req: HttpRequest): HttpResponse = throw HttpException(HttpException.Kind.Io, "PATCH is not supported by this client")
+
     /**
      * GET [req] and hand the head and the unread body to [handle], so a caller can refuse a body by its size or stop
      * partway through it; the connection is released when [handle] returns. A non-2xx status reaches [handle] like any
