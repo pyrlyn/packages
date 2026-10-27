@@ -8,7 +8,7 @@ formats the same way.
 
 | Module | Package | What |
 | --- | --- | --- |
-| `pyrlyn.kit:cli` | `cli` | `command`, `Command`, `Arg`, `ValueKind`, `PossibleValue`, `parse`, `Parsed`, `Matches`, `Settings`, `help`: a declarative command tree read with clap 4.6's semantics, whose help, usage and errors match a clap program's byte for byte |
+| `pyrlyn.kit:cli` | `cli` | `command`, `Command`, `Arg`, `ValueKind`, `PossibleValue`, `parse`, `Parsed`, `Matches`, `Settings`, `help`, `completions`, `CompletionShell`, `valueOptions`: a declarative command tree read with clap 4.6's semantics, whose help, usage and errors match a clap program's byte for byte, and the bash, elvish, fish, PowerShell and zsh scripts clap_complete writes for it; on native, `terminalSettings` and `Parsed.Exit.write` read the terminal as clap does |
 | `pyrlyn.kit:fs` | `fs` | `WriteOptions`, `atomic`, `ifChanged`, `textOrEmpty`, `copyTree`, `removeAny`, `createNew`, `hardLink`, `symlink`, `createDir`, `setMode`, `removeFile`, `removeEmptyDir`, `rename`, `modifiedAgo`, `setTimes`, `FsException`: crash-safe file writes and tree helpers over POSIX (port of Rust fs-kit) |
 | `pyrlyn.kit:toml` | `toml` | `TomlReader`, `TomlDocument`, `TomlValues`, `TomlException`: TOML into kotlinx-serialization JSON trees; `TomlParser`: a strict TOML 1.1 reader that passes all of toml-test; `TomlWriter`: JSON trees into TOML text exactly as Rust `toml` 1.1 writes it |
 | `pyrlyn.kit:toml-ktoml` | `toml.ktoml` | `KtomlReader` over [ktoml](https://github.com/orchestr7/ktoml) |
