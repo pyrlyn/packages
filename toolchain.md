@@ -11,7 +11,7 @@
 
 | Package | Where | Source | Why here |
 | --- | --- | --- | --- |
-| org.jetbrains.kotlinx:kotlinx-io-core 0.9.1 | local (`:fs`) | https://github.com/Kotlin/kotlinx-io | `Path` in the file API |
+| org.jetbrains.kotlinx:kotlinx-io-core 0.9.1 | local (`:fs`; `:toml` tests) | https://github.com/Kotlin/kotlinx-io | `Path` in the file API; reading the toml-test files |
 | org.jetbrains.kotlinx:kotlinx-serialization-json 1.12.0 | local (`:toml`) | https://github.com/Kotlin/kotlinx.serialization | TOML values as JSON trees |
 | com.akuleshov7:ktoml-core 0.7.1 | local (`:toml-ktoml`) | https://github.com/orchestr7/ktoml | TOML parser and writer |
 | org.jetbrains.kotlinx:kotlinx-coroutines-core 1.11.0 | local (`:http`) | https://github.com/Kotlin/kotlinx.coroutines | The `suspend` HTTP API |

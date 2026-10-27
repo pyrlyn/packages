@@ -9,7 +9,7 @@ formats the same way.
 | Module | Package | What |
 | --- | --- | --- |
 | `pyrlyn.kit:fs` | `fs` | `WriteOptions`, `atomic`, `ifChanged`, `textOrEmpty`, `copyTree`, `removeAny`, `FsException`: crash-safe file writes and tree helpers over POSIX (port of Rust fs-kit) |
-| `pyrlyn.kit:toml` | `toml` | `TomlReader`, `TomlDocument`, `TomlValues`, `TomlException`: TOML into kotlinx-serialization JSON trees; `TomlWriter`: JSON trees into TOML text exactly as Rust `toml` 1.1 writes it |
+| `pyrlyn.kit:toml` | `toml` | `TomlReader`, `TomlDocument`, `TomlValues`, `TomlException`: TOML into kotlinx-serialization JSON trees; `TomlParser`: a strict TOML 1.1 reader that passes all of toml-test; `TomlWriter`: JSON trees into TOML text exactly as Rust `toml` 1.1 writes it |
 | `pyrlyn.kit:toml-ktoml` | `toml.ktoml` | `KtomlReader` over [ktoml](https://github.com/orchestr7/ktoml) |
 | `pyrlyn.kit:toml-aot` | `tomlaot` | `TomlDoc`: a TOML editor that keeps comments and layout |
 | `pyrlyn.kit:yaml-aot` | `yamlaot` | `Yaml.parse` into `YamlValue`, `YamlText` scalar writing |

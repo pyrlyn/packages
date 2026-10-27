@@ -9,7 +9,7 @@ client and SQLite. Each concern is an engine-neutral interface plus, where a thi
 does the work, one adapter module:
 
 - `:fs`, crash-safe file writes and tree helpers over POSIX (no third-party library).
-- `:toml` (interface) and `:toml-ktoml` (ktoml); `:toml-aot`, a comment-keeping TOML editor.
+- `:toml` (interface, `TomlWriter` and the strict `TomlParser`, checked against `toml/testdata/toml-test`) and `:toml-ktoml` (ktoml); `:toml-aot`, a comment-keeping TOML editor.
 - `:yaml-aot`, a YAML reader and scalar writer.
 - `:semver`, version ordering.
 - `:http` (interface) and `:http-ktor` (Ktor client).
