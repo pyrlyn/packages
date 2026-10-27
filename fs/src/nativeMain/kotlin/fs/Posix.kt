@@ -55,6 +55,13 @@ fun isDir(path: Path): Boolean = statMode(path)?.let { (it and S_IFMT) == S_IFDI
 /** The permission bits (`0o777` and above it the set-id and sticky bits), following links; null when missing. */
 fun mode(path: Path): Int? = statMode(path)?.let { it and MODE_BITS }
 
+/** The permission bits of [path] itself, a link not followed (Rust `symlink_metadata().permissions()`); null when missing. */
+fun linkMode(path: Path): Int? =
+    memScoped {
+        val st = alloc<stat>()
+        if (lstat(path.toString(), st.ptr) == 0) st.st_mode.toInt() and MODE_BITS else null
+    }
+
 private fun statMode(path: Path): Int? =
     memScoped {
         val st = alloc<stat>()

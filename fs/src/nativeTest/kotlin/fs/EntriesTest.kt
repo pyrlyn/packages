@@ -10,6 +10,20 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 class EntriesTest {
+    /** A link's own bits are not its target's: a tree digest that followed it would miss a retargeted link. */
+    @Test
+    fun linkModeReadsTheLinkNotItsTarget(): Unit =
+        withTempDir { dir ->
+            val file = Path(dir, "f")
+            createNew(file, "x".encodeToByteArray())
+            setMode(file, "600".toInt(8))
+            symlink(file, Path(dir, "l"))
+            assertEquals("600".toInt(8), linkMode(file))
+            assertEquals("600".toInt(8), mode(Path(dir, "l")))
+            assertTrue(linkMode(Path(dir, "l")) != "600".toInt(8))
+            assertEquals(null, linkMode(Path(dir, "missing")))
+        }
+
     @Test
     fun createNewWritesOnceAndThenRefuses(): Unit =
         withTempDir { dir ->
