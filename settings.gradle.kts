@@ -15,4 +15,4 @@ plugins {
 
 rootProject.name = "kotlin-kit"
 
-include(":fs", ":toml", ":toml-ktoml", ":toml-aot", ":yaml-aot", ":semver", ":http", ":http-ktor", ":db", ":db-room", ":db-sqldelight", ":process", ":archive", ":loopback")
+include(":cli", ":fs", ":toml", ":toml-ktoml", ":toml-aot", ":yaml-aot", ":semver", ":http", ":http-ktor", ":db", ":db-room", ":db-sqldelight", ":process", ":archive", ":loopback")
