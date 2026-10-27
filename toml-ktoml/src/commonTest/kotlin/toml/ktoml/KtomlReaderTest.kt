@@ -16,6 +16,11 @@ class KtomlReaderTest {
         assertEquals("y", r["e"]!!.jsonPrimitive.content)
     }
 
+    @Test fun aKeyWithoutAValueIsAnError() {
+        assertFailsWith<TomlException> { p("name = ") }
+        assertFailsWith<TomlException> { p("[t]\nname = null\n") }
+    }
+
     @Test fun nestedTables() {
         val r = p("[a.b]\nx = 1\n[a]\ny = 2\n")
         assertEquals(

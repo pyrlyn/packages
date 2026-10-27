@@ -74,9 +74,14 @@ private class TreeBuilder(
     ): JsonElement =
         when (n) {
             is TomlTable -> if (n.type == TableType.ARRAY) JsonArray(n.children.filterIsInstance<TomlArrayOfTablesElement>().map { obj(it.children, path) }) else obj(n.children, path)
+
             is TomlInlineTable -> obj(n.children, path)
-            is TomlKeyValuePrimitive -> value(n.value)
+
+            // ktoml reads `key =` and `key = null` as a null; TOML has no null, and both are errors there.
+            is TomlKeyValuePrimitive -> value(n.value).also { if (it is JsonNull) throw TomlException("TOML parse error at line ${n.lineNo}: '${path.joinToString(".")}' has no value") }
+
             is TomlKeyValueArray -> value(n.value)
+
             else -> obj(n.children, path)
         }
 
