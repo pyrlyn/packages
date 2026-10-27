@@ -123,15 +123,16 @@ private fun readFd(
     return all
 }
 
-/** Write all of [bytes] to [fd]; a short write continues where it stopped. */
+/** Write the first [size] bytes of [bytes] to [fd]; a short write continues where it stopped. */
 internal fun writeAll(
     fd: Int,
     bytes: ByteArray,
     path: Path,
+    size: Int = bytes.size,
 ) {
     var at = 0
-    while (at < bytes.size) {
-        val n = bytes.usePinned { p -> retry { write(fd, p.addressOf(at), (bytes.size - at).convert()).toInt() } }
+    while (at < size) {
+        val n = bytes.usePinned { p -> retry { write(fd, p.addressOf(at), (size - at).convert()).toInt() } }
         if (n < 0) throw FsException.ofErrno(path)
         at += n
     }
