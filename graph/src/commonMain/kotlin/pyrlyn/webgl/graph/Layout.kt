@@ -135,5 +135,5 @@ fun layoutCloud(
     return CloudLayout(placed.sortedBy { order[it.graph.id] }, minV, maxV)
 }
 
-/** A cluster's radius: 1 for an empty or single-node graph, growing as √n. */
-fun clusterRadius(g: Graph): Double = max(1.0, sqrt(g.nodes.size.toDouble()))
+/** A cluster's radius: 1 for an empty or single-node graph, growing as √n of its [Graph.count]. */
+fun clusterRadius(g: Graph): Double = max(1.0, sqrt(max(g.count, g.nodes.size).toDouble()))

@@ -143,19 +143,22 @@ class CloudState(
         if (focused != null && layout.cluster(focused!!) == null) focused = null
     }
 
-    /** Flies into cluster [id]. */
-    fun enter(id: String) {
+    /** Flies into cluster [id]; [notify] tells the listener (false when the consumer itself asked). */
+    fun enter(
+        id: String,
+        notify: Boolean = true,
+    ) {
         val c = layout.cluster(id) ?: return
         focused = id
         camera.flyTo(camera.fit(c.center - Vec(c.radius, c.radius), c.center + Vec(c.radius, c.radius)), now)
-        listener.focused(id)
+        if (notify) listener.focused(id)
     }
 
     /** Flies back to the whole cloud. */
-    fun back() {
+    fun back(notify: Boolean = true) {
         focused = null
         camera.flyTo(camera.fit(layout.min, layout.max), now)
-        listener.focused(null)
+        if (notify) listener.focused(null)
     }
 
     fun tick(nowMs: Double) {

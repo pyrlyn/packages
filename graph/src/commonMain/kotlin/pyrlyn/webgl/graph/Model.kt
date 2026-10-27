@@ -41,6 +41,8 @@ data class Graph(
     val edges: List<Edge>,
     /** Drawn as the cluster's summary colour when zoomed out. */
     val style: Int = 0,
+    /** Size for the cluster radius: the node count, or a larger known total when [nodes] is a partial load. */
+    val count: Int = nodes.size,
 )
 
 /** Several graphs shown together. */

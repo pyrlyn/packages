@@ -82,4 +82,10 @@ class GraphTest {
         assertEquals(Hit.Node("a", node.key), pick(l, cam, cam.toScreen(node.value)))
         assertNull(pick(l, cam, Vec(-10_000.0, -10_000.0)))
     }
+
+    @Test
+    fun countSizesAClusterWhoseNodesAreNotLoaded() {
+        assertEquals(1.0, clusterRadius(Graph("a", "a", emptyList(), emptyList())))
+        assertEquals(10.0, clusterRadius(Graph("a", "a", emptyList(), emptyList(), count = 100)))
+    }
 }
