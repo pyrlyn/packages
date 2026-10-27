@@ -1,6 +1,6 @@
 # kotlin-kit
 
-Small Kotlin/Native libraries shared by several projects: files, TOML, YAML, semver, HTTP and SQLite.
+Small Kotlin/Native libraries shared by several projects: files, TOML, YAML, semver, HTTP, SQLite and child processes.
 They started as rtok-kotlin's `libs/` and are shared so that projects read and write the same
 formats the same way.
 
@@ -18,6 +18,7 @@ formats the same way.
 | `pyrlyn.kit:http-ktor` | `http.ktor` | `KtorHttp` over the [Ktor](https://github.com/ktorio/ktor) client (Darwin, Curl) |
 | `pyrlyn.kit:db` | `db` | `Db`, `DbDriver`, `Row`, `DbException`: a driver-neutral SQL interface |
 | `pyrlyn.kit:db-room` | `db.room` | `RoomDbDriver` over androidx.sqlite with bundled SQLite |
+| `pyrlyn.kit:process` | `process` | `Command.runBounded`, `Output`, `ExitStatus`, `ProcessException`: a child with no stdin, capped output and a deadline that kills its process group (POSIX `posix_spawn`) |
 
 ## Use
 
