@@ -20,10 +20,18 @@ class TempDir private constructor(
 
     companion object {
         /** Create one named [prefix] and six random characters; fails as [FsException]. */
-        fun create(prefix: String = ".tmp"): TempDir {
-            val base = (getenv("TMPDIR")?.toKString() ?: "/tmp").trimEnd('/')
-            val made = memScoped { mkdtemp("$base/${prefix}XXXXXX".cstr.ptr)?.toKString() }
-            return TempDir(Path(made ?: throw FsException.ofErrno(Path(base))))
+        fun create(prefix: String = ".tmp"): TempDir = createIn(Path((getenv("TMPDIR")?.toKString() ?: "/tmp").trimEnd('/')), prefix)
+
+        /**
+         * Rust `tempfile::tempdir_in`: the same, inside [dir]. A directory staged next to where its contents end up
+         * can be renamed into place, which one under `$TMPDIR` on another filesystem cannot.
+         */
+        fun createIn(
+            dir: Path,
+            prefix: String = ".tmp",
+        ): TempDir {
+            val made = memScoped { mkdtemp("$dir/${prefix}XXXXXX".cstr.ptr)?.toKString() }
+            return TempDir(Path(made ?: throw FsException.ofErrno(dir)))
         }
     }
 }
