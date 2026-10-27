@@ -4,10 +4,11 @@ If an `AGENTS.md` or `CLAUDE.md` exists higher in the tree, follow it too; on co
 
 ## What this project is
 
-Small Kotlin Multiplatform libraries shared by several projects: TOML, YAML, semver, an HTTP
+Small Kotlin Multiplatform libraries shared by several projects: files, TOML, YAML, semver, an HTTP
 client and SQLite. Each concern is an engine-neutral interface plus, where a third-party library
 does the work, one adapter module:
 
+- `:fs`, crash-safe file writes and tree helpers over POSIX (no third-party library).
 - `:toml` (interface) and `:toml-ktoml` (ktoml); `:toml-aot`, a comment-keeping TOML editor.
 - `:yaml-aot`, a YAML reader and scalar writer.
 - `:semver`, version ordering.

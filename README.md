@@ -1,6 +1,6 @@
 # kotlin-kit
 
-Small Kotlin/Native libraries shared by several projects: TOML, YAML, semver, HTTP and SQLite.
+Small Kotlin/Native libraries shared by several projects: files, TOML, YAML, semver, HTTP and SQLite.
 They started as rtok-kotlin's `libs/` and are shared so that projects read and write the same
 formats the same way.
 
@@ -8,6 +8,7 @@ formats the same way.
 
 | Module | Package | What |
 | --- | --- | --- |
+| `pyrlyn.kit:fs` | `fs` | `WriteOptions`, `atomic`, `ifChanged`, `textOrEmpty`, `copyTree`, `removeAny`, `FsException`: crash-safe file writes and tree helpers over POSIX (port of Rust fs-kit) |
 | `pyrlyn.kit:toml` | `toml` | `TomlReader`, `TomlDocument`, `TomlValues`, `TomlException`: TOML into kotlinx-serialization JSON trees |
 | `pyrlyn.kit:toml-ktoml` | `toml.ktoml` | `KtomlReader` over [ktoml](https://github.com/orchestr7/ktoml) |
 | `pyrlyn.kit:toml-aot` | `tomlaot` | `TomlDoc`: a TOML editor that keeps comments and layout |
