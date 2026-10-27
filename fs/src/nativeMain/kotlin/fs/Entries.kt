@@ -1,5 +1,5 @@
-// Single-entry operations Rust's std::fs has and kotlinx-io does not: exclusive create, hard links, plain removal
-// and modification times, which a lock file is built from.
+// Single-entry operations Rust's std::fs has and kotlinx-io does not: exclusive create, links, plain removal, modes
+// and modification times, which a lock file and an archive extractor are built from.
 @file:OptIn(ExperimentalForeignApi::class)
 
 package fs
@@ -7,6 +7,7 @@ package fs
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.LongVar
 import kotlinx.cinterop.alloc
+import kotlinx.cinterop.convert
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.value
@@ -15,9 +16,12 @@ import platform.posix.O_CLOEXEC
 import platform.posix.O_CREAT
 import platform.posix.O_EXCL
 import platform.posix.O_WRONLY
+import platform.posix.chmod
 import platform.posix.close
 import platform.posix.link
+import platform.posix.mkdir
 import platform.posix.open
+import platform.posix.symlink
 import platform.posix.unlink
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.nanoseconds
@@ -44,6 +48,21 @@ fun hardLink(
     original: Path,
     link: Path,
 ) = ensure(link(original.toString(), link.toString()) == 0, link)
+
+/** Create [link] as a symbolic link holding [target], as written (Rust `unix::fs::symlink`); an existing [link] is [FsException.Kind.AlreadyExists]. */
+fun symlink(
+    target: Path,
+    link: Path,
+) = ensure(symlink(target.toString(), link.toString()) == 0, link)
+
+/** Create one directory, not its parents (Rust `create_dir`); an existing entry is [FsException.Kind.AlreadyExists]. */
+fun createDir(path: Path) = ensure(mkdir(path.toString(), DIR_MODE.convert()) == 0, path)
+
+/** Set [path]'s permission bits to [bits], following a link (Rust `set_permissions` with `from_mode`). */
+fun setMode(
+    path: Path,
+    bits: Int,
+) = ensure(chmod(path.toString(), bits.convert()) == 0, path)
 
 /** Remove one file or link, never a directory (Rust `remove_file`); a missing one is [FsException.Kind.NotFound]. */
 fun removeFile(path: Path) = ensure(unlink(path.toString()) == 0, path)

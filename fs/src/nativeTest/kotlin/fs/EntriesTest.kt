@@ -49,4 +49,34 @@ class EntriesTest {
             assertTrue(modifiedAgo(file) in 20.seconds..1.minutes, modifiedAgo(file).toString())
             assertEquals(FsException.Kind.NotFound, assertFailsWith<FsException> { modifiedAgo(Path(dir, "nope")) }.kind)
         }
+
+    @Test
+    fun aSymlinkKeepsItsTargetAsWritten(): Unit =
+        withTempDir { dir ->
+            val link = Path(dir, "l")
+            symlink(Path("../elsewhere"), link)
+            assertEquals(Path("../elsewhere"), readLink(link))
+            assertEquals(EntryKind.Symlink, entryKind(link))
+            assertEquals(FsException.Kind.AlreadyExists, assertFailsWith<FsException> { symlink(Path("x"), link) }.kind)
+        }
+
+    @Test
+    fun createDirMakesOneLevelAndRefusesWhatIsThere(): Unit =
+        withTempDir { dir ->
+            val sub = Path(dir, "a")
+            createDir(sub)
+            assertTrue(isDir(sub))
+            assertEquals(FsException.Kind.AlreadyExists, assertFailsWith<FsException> { createDir(sub) }.kind)
+            assertEquals(FsException.Kind.NotFound, assertFailsWith<FsException> { createDir(Path(dir, "b/c")) }.kind)
+        }
+
+    @Test
+    fun setModeSetsTheBitsAsGiven(): Unit =
+        withTempDir { dir ->
+            val file = Path(dir, "f")
+            createNew(file, ByteArray(0))
+            setMode(file, 0b111_101_000)
+            assertEquals(0b111_101_000, mode(file))
+            assertEquals(FsException.Kind.NotFound, assertFailsWith<FsException> { setMode(Path(dir, "nope"), 0) }.kind)
+        }
 }

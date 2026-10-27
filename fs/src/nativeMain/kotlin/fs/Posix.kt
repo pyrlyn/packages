@@ -153,5 +153,5 @@ internal inline fun retry(call: () -> Int): Int {
 }
 
 private const val MODE_BITS = 0b111_111_111_111
-private const val DIR_MODE = 0b111_111_111
+internal const val DIR_MODE = 0b111_111_111
 private const val CHUNK = 64 * 1024
