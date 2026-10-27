@@ -20,6 +20,21 @@ class RoomDbTest {
         }
     }
 
+    @Test fun aCursorIsSteppedByItsCaller() {
+        open().use { db ->
+            db.exec("CREATE TABLE t (a INTEGER); INSERT INTO t VALUES (1), (2), (3)")
+            val seen =
+                db.cursor("SELECT a FROM t WHERE a > ? ORDER BY a", 1) { c ->
+                    assertTrue(c.next())
+                    val first = c.long(0)
+                    assertTrue(c.next())
+                    first to c.long(0)
+                }
+            assertEquals(2L to 3L, seen)
+            assertFalse(db.cursor("SELECT a FROM t WHERE a > 9") { it.next() })
+        }
+    }
+
     @Test fun transactionRollsBackAndNests() {
         open().use { db ->
             db.exec("CREATE TABLE t (a INTEGER)")

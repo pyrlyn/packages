@@ -42,6 +42,12 @@ interface Row {
     fun name(i: Int): String
 }
 
+/** A running query read one row at a time; valid only inside the [Db.cursor] call that made it. */
+interface Cursor : Row {
+    /** Step to the next row; false once there are no more. */
+    fun next(): Boolean
+}
+
 /** Opens connections; one implementation per driver. */
 interface DbDriver {
     fun open(path: String): Db
@@ -66,6 +72,13 @@ interface Db : AutoCloseable {
         vararg args: Any?,
         map: (Row) -> T,
     ): List<T>
+
+    /** One query the caller steps through itself, for a binding that drives its own loop over the rows. */
+    fun <T> cursor(
+        sql: String,
+        vararg args: Any?,
+        use: (Cursor) -> T,
+    ): T
 
     fun lastInsertRowid(): Long
 

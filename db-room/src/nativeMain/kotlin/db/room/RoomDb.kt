@@ -11,6 +11,7 @@ import androidx.sqlite.driver.bundled.SQLITE_OPEN_CREATE
 import androidx.sqlite.driver.bundled.SQLITE_OPEN_FULLMUTEX
 import androidx.sqlite.driver.bundled.SQLITE_OPEN_READWRITE
 import androidx.sqlite.driver.bundled.SQLITE_OPEN_URI
+import db.Cursor
 import db.Db
 import db.DbDriver
 import db.DbException
@@ -37,9 +38,11 @@ internal inline fun <T> mapped(block: () -> T): T =
         throw DbException(m?.groupValues?.get(1)?.toInt() ?: 1, m?.groupValues?.get(2) ?: e.message ?: "sqlite error")
     }
 
-private class StatementRow(
+private class StatementCursor(
     private val st: SQLiteStatement,
-) : Row {
+) : Cursor {
+    override fun next() = st.step()
+
     override fun isNull(i: Int) = st.isNull(i)
 
     override fun long(i: Int) = st.getLong(i)
@@ -84,12 +87,17 @@ private class RoomDb(
         vararg args: Any?,
         map: (Row) -> T,
     ): List<T> =
-        run(sql, args) { st ->
-            val row = StatementRow(st)
+        cursor(sql, *args) { row ->
             val out = ArrayList<T>()
-            while (st.step()) out += map(row)
+            while (row.next()) out += map(row)
             out
         }
+
+    override fun <T> cursor(
+        sql: String,
+        vararg args: Any?,
+        use: (Cursor) -> T,
+    ): T = run(sql, args) { st -> use(StatementCursor(st)) }
 
     override fun lastInsertRowid(): Long = scalar("SELECT last_insert_rowid()")
 
