@@ -402,6 +402,13 @@ class TextTest {
     }
 
     @Test
+    fun plainDropsEveryEscapeAndKeepsTheText() {
+        val styled = Style(on = true)
+        assertEquals("error: --x", plain(styled.error("error:") + " " + styled.literal("--x")))
+        assertEquals("no escapes", plain("no escapes"))
+    }
+
+    @Test
     fun jaroMatchesStrsim() {
         assertEquals(0.9166666666666666, jaro("lst", "list"), 1e-12)
         assertEquals(listOf("pin", "i", "info"), didYouMean("infx", listOf("install", "i", "info", "pin")))

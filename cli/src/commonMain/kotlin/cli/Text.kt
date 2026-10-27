@@ -53,6 +53,20 @@ internal fun width(s: String): Int {
     return n
 }
 
+/** [text] without its escape sequences: what anstream writes to a stream that shows no colour. */
+fun plain(text: String): String {
+    val out = StringBuilder()
+    var i = 0
+    while (i < text.length) {
+        if (text[i] == ESC) {
+            i = escapeEnd(text, i)
+        } else {
+            out.append(text[i++])
+        }
+    }
+    return out.toString()
+}
+
 internal fun spaces(n: Int) = " ".repeat(maxOf(n, 0))
 
 /** clap's `StyledStr::indent("", trailing)`: every line after the first starts with [trailing]. */

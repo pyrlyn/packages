@@ -1,13 +1,14 @@
 package cli
 
-/** clap's width when it cannot ask the terminal, and the most it uses even when it can. */
+/** clap's width when neither the terminal nor `COLUMNS` gives one. */
 const val DEFAULT_WIDTH = 100
 
 /**
  * How [parse] writes.
  *
- * [binName] is what usage calls the program (clap takes it from `argv[0]`); [width] is the terminal's columns, at
- * most [DEFAULT_WIDTH] as clap caps it; [color] paints help and errors with clap's default styles.
+ * [binName] is what usage calls the program (clap takes it from `argv[0]`); [width] is the terminal's columns, which
+ * clap with `wrap_help` uses uncapped; [color] paints help and errors with clap's default styles, which [plain] can
+ * take back out for a stream that shows no colour, as anstream does.
  */
 class Settings(
     val binName: String,
