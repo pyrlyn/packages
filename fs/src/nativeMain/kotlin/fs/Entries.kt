@@ -84,3 +84,12 @@ fun setModifiedAgo(
     val rc = fs.mtime.kit_set_modified_ago(path.toString(), ago.inWholeNanoseconds)
     if (rc != 0) throw FsException.ofErrno(path, rc)
 }
+
+/** Set [path]'s access and modification times to [epochSeconds], following a link (what tar-rs does on unpack). */
+fun setTimes(
+    path: Path,
+    epochSeconds: Long,
+) {
+    val rc = fs.mtime.kit_set_times(path.toString(), epochSeconds)
+    if (rc != 0) throw FsException.ofErrno(path, rc)
+}

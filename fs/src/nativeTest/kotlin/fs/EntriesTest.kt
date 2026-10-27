@@ -5,6 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
@@ -48,6 +49,17 @@ class EntriesTest {
             setModifiedAgo(file, 20.seconds)
             assertTrue(modifiedAgo(file) in 20.seconds..1.minutes, modifiedAgo(file).toString())
             assertEquals(FsException.Kind.NotFound, assertFailsWith<FsException> { modifiedAgo(Path(dir, "nope")) }.kind)
+        }
+
+    @Test
+    fun timesCanBeSetToAMomentLongAgo(): Unit =
+        withTempDir { dir ->
+            val file = Path(dir, "f")
+            file.write("x")
+            setTimes(file, 1)
+            val age = modifiedAgo(file)
+            assertTrue(age > (50 * 365).days, "$age")
+            assertEquals(FsException.Kind.NotFound, assertFailsWith<FsException> { setTimes(Path(dir, "nope"), 1) }.kind)
         }
 
     @Test
