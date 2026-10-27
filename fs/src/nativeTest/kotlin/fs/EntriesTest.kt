@@ -55,6 +55,30 @@ class EntriesTest {
         }
 
     @Test
+    fun renameReplacesAFileAndKeepsTheErrorKind(): Unit =
+        withTempDir { dir ->
+            val a = Path(dir, "a")
+            val b = Path(dir, "b")
+            createNew(a, "new".encodeToByteArray())
+            createNew(b, "old".encodeToByteArray())
+            rename(a, b)
+            assertEquals("new", b.text())
+            assertEquals(FsException.Kind.NotFound, assertFailsWith<FsException> { rename(a, b) }.kind)
+        }
+
+    @Test
+    fun removeEmptyDirLeavesADirectoryThatHoldsSomething(): Unit =
+        withTempDir { dir ->
+            val full = Path(dir, "full")
+            createDir(full)
+            createNew(Path(full, "f"), ByteArray(0))
+            assertFailsWith<FsException> { removeEmptyDir(full) }
+            removeFile(Path(full, "f"))
+            removeEmptyDir(full)
+            assertEquals(FsException.Kind.NotFound, assertFailsWith<FsException> { removeEmptyDir(full) }.kind)
+        }
+
+    @Test
     fun aModificationTimeCanBeReadAndMovedBack(): Unit =
         withTempDir { dir ->
             val file = Path(dir, "f")

@@ -21,6 +21,8 @@ import platform.posix.close
 import platform.posix.link
 import platform.posix.mkdir
 import platform.posix.open
+import platform.posix.rename
+import platform.posix.rmdir
 import platform.posix.symlink
 import platform.posix.unlink
 import kotlin.time.Duration
@@ -66,6 +68,18 @@ fun setMode(
 
 /** Remove one file or link, never a directory (Rust `remove_file`); a missing one is [FsException.Kind.NotFound]. */
 fun removeFile(path: Path) = ensure(unlink(path.toString()) == 0, path)
+
+/** Remove [path] if it is an empty directory (Rust `remove_dir`); one with anything in it stays and is an error. */
+fun removeEmptyDir(path: Path) = ensure(rmdir(path.toString()) == 0, path)
+
+/**
+ * Give [from] the name [to] in one `rename(2)`, replacing a file there (Rust `fs::rename`). Unlike kotlinx-io's
+ * `atomicMove`, the error keeps its [FsException.kind] and errno, so a caller can tell a passing lock from a refusal.
+ */
+fun rename(
+    from: Path,
+    to: Path,
+) = ensure(rename(from.toString(), to.toString()) == 0, from)
 
 /** How long ago [path] was last modified, by the wall clock; zero for a time in the future (Rust `modified()?.elapsed()`). */
 fun modifiedAgo(path: Path): Duration =
