@@ -53,7 +53,7 @@ internal class Help(
         for (arg in args.filter { it.takesValue || it.long != null || it.short == null }) {
             longest = maxOf(longest, width(node.display(arg)) + if (arg.positional) 0 else SHORT_SIZE)
         }
-        val nextLine = args.any { nextLine(it.help.orEmpty(), specs(it), longest) }
+        val nextLine = useLong || args.any { nextLine(it.help.orEmpty(), specs(it), longest) }
         val separator = if (nextLine && useLong) "\n\n" else "\n"
         return args.joinToString(separator) { row(it, nextLine, longest) }
     }
@@ -92,6 +92,7 @@ internal class Help(
     private fun subcommands(): String {
         val visible = node.cmd.subcommands.filter { !it.hidden }
         val longest = maxOf(2, visible.maxOf { width(it.name) })
+        // Subcommands are only ever listed with their short about, so long help alone does not push them down.
         val nextLine = visible.any { nextLine(it.about.orEmpty(), aliases(it), longest) }
         return visible.joinToString("\n") { sub ->
             val padding = if (nextLine) "" else spaces(longest + TAB_WIDTH - width(sub.name))
@@ -123,7 +124,6 @@ internal class Help(
         specs: String,
         longest: Int,
     ): Boolean {
-        if (useLong) return true
         val taken = longest + TAB_WIDTH * 2
         return width >= taken && taken.toFloat() / width > NEXT_LINE_SHARE && width(help) + width(specs) > width - taken
     }

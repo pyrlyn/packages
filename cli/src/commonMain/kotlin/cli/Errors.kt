@@ -83,7 +83,7 @@ internal class Errors(
 
     fun emptyValue(arg: Arg) =
         render(
-            "a value is required for '${style.literal(node.display(arg))}' but none was supplied",
+            "a value is required for '${style.invalid(node.display(arg))}' but none was supplied",
             context = values(arg),
         )
 

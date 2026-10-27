@@ -188,6 +188,20 @@ class HelpTest {
     }
 
     @Test
+    fun longHelpMovesArgumentHelpDownButNotSubcommandAbouts() {
+        val tool =
+            command("tool") {
+                about = "Short"
+                longAbout = "Long.\n\nMore."
+                flag("x") { doc("An x") }
+                subcommand("run") { doc("Run it") }
+            }
+        val text = help(tool, emptyList(), Settings("tool"), long = true)
+        assertTrue(Regex("\n  run +Run it\n").containsMatchIn(text), text)
+        assertTrue("      --x\n          An x\n" in text, text)
+    }
+
+    @Test
     fun aNarrowTerminalMovesHelpUnderTheArguments() {
         val text = help(tree, listOf("add"), Settings("tool", width = 40))
         assertTrue("  [PKG]...  Packages to add\n" in text, text)
@@ -366,6 +380,8 @@ class ErrorTest {
     fun colourUsesClapsStyles() {
         val text = assertIs<Parsed.Exit>(parse(tree, listOf("-x"), Settings("tool", color = true))).text
         assertTrue(text.startsWith("\u001b[1m\u001b[31merror:\u001b[0m unexpected argument '\u001b[33m-x\u001b[0m' found"), text)
+        val empty = assertIs<Parsed.Exit>(parse(tree, listOf("add", "--jobs"), Settings("tool", color = true))).text
+        assertTrue("a value is required for '\u001b[33m--jobs <N>\u001b[0m' but none was supplied" in empty, empty)
     }
 }
 
