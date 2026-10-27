@@ -91,4 +91,64 @@ class KtorHttpTest {
                 assertTrue("connection refused" in e.message!!)
             }
         }
+
+    @Test fun aStreamHandsOverTheHeadBeforeTheBodyAndThenTheBodyInChunks() =
+        runBlocking {
+            val payload = ByteArray(10_000) { (it % 251).toByte() }
+            client { respond(payload, HttpStatusCode.OK, headersOf(HttpHeaders.ContentLength, payload.size.toString())) }.use { c ->
+                val got =
+                    c.stream(HttpRequest("http://x/asset")) { head, body ->
+                        assertEquals(200, head.status)
+                        assertEquals(payload.size.toString(), head.header("content-length"))
+                        val out = mutableListOf<Byte>()
+                        val buf = ByteArray(1024)
+                        while (true) {
+                            val n = body.read(buf)
+                            if (n < 0) break
+                            for (i in 0 until n) out += buf[i]
+                        }
+                        out.toByteArray()
+                    }
+                assertContentEquals(payload, got)
+            }
+        }
+
+    @Test fun aStreamGivesANonSuccessStatusToTheHandler() =
+        runBlocking {
+            client { respond("""{"message":"Not Found"}""", HttpStatusCode.NotFound) }.use { c ->
+                assertEquals(404, c.stream(HttpRequest("http://x/")) { head, _ -> head.status })
+            }
+        }
+
+    @Test fun whatAStreamHandlerThrowsPassesThroughUnchanged() =
+        runBlocking {
+            client { respond("body") }.use { c ->
+                val e = assertFailsWith<IllegalStateException> { c.stream(HttpRequest("http://x/")) { _, _ -> error("too big") } }
+                assertEquals("too big", e.message)
+            }
+        }
+
+    @Test fun aStreamThatGetsNoResponseMapsToIo() =
+        runBlocking {
+            client { throw IllegalStateException("connection refused") }.use { c ->
+                val e = assertFailsWith<HttpException> { c.stream(HttpRequest("http://x/")) { _, _ -> } }
+                assertEquals(HttpException.Kind.Io, e.kind)
+            }
+        }
+
+    /** GitHub answers an asset download with a redirect to a CDN, which must not receive the token. */
+    @Test fun aRedirectToAnotherHostDropsTheAuthorizationHeader() =
+        runBlocking {
+            val seen = mutableMapOf<String, String?>()
+            client { req ->
+                seen[req.url.host + req.url.encodedPath] = req.headers[HttpHeaders.Authorization]
+                when (req.url.host) {
+                    "api.x" -> respond("", HttpStatusCode.Found, headersOf(HttpHeaders.Location, "http://cdn.y/blob"))
+                    else -> respond("bytes")
+                }
+            }.use { c ->
+                c.stream(HttpRequest("http://api.x/asset", listOf("authorization" to "Bearer t"))) { head, _ -> assertEquals(200, head.status) }
+            }
+            assertEquals(mapOf("api.x/asset" to "Bearer t", "cdn.y/blob" to null), seen)
+        }
 }
