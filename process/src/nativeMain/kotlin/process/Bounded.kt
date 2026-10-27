@@ -33,7 +33,6 @@ import platform.posix.kill
 import platform.posix.poll
 import platform.posix.pollfd
 import platform.posix.read
-import platform.posix.strerror
 import platform.posix.usleep
 import platform.posix.waitpid
 import process.spawn.kit_environ
@@ -279,4 +278,3 @@ internal fun mergedEnv(extra: Map<String, String>): List<String> =
     }
 
 /** An errno worded as Rust prints an OS error: `No such file or directory (os error 2)`. */
-private fun osError(code: Int) = "${strerror(code)?.toKString()} (os error $code)"

@@ -20,7 +20,7 @@ formats the same way.
 | `pyrlyn.kit:db-room` | `db.room` | `RoomDbDriver` over androidx.sqlite with bundled SQLite |
 | `pyrlyn.kit:db-sqldelight` | `db.sqldelight` | `KitSqlDriver`: [SQLDelight](https://github.com/sqldelight/sqldelight)'s generated queries on a `Db` |
 | `pyrlyn.kit:archive` | `archive` | `gzipSource`, `bzip2Source`, `xzSource`, `deflateSource` (and `gzip`, `bzip2`, `deflate`, `crc32`): streaming codecs as kotlinx-io sources; `TarReader`, `TarWriter`, `ZipReader`, `ZipWriter`; `ArchiveException`. Reads archives as tar-rs and Rust zip do, with every length an archive states checked; zlib from the platform, bzip2 and liblzma linked statically from Conan |
-| `pyrlyn.kit:process` | `process` | `Command.runBounded`, `Output`, `ExitStatus`, `ProcessException`: a child with no stdin, capped output and a deadline that kills its process group (POSIX `posix_spawn`) |
+| `pyrlyn.kit:process` | `process` | `Command.runBounded`, `Output`, `ExitStatus`, `ProcessException`: a child with no stdin, capped output and a deadline that kills its process group (POSIX `posix_spawn`); `Command.status` for a child that shares the terminal; `currentExe` |
 | `pyrlyn.kit:loopback` | `loopback` | `LoopbackServer`: an HTTP/1.1 server on 127.0.0.1 for tests, written over sockets so a reply can break framing (a lying `Content-Length`, a cut-off body) |
 
 ## Use
