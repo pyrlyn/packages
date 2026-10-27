@@ -50,10 +50,14 @@ class Output(
     val stderr: ByteArray,
 )
 
-/** The child could not be run, waited on or finished in time: [detail] in words, and the stderr drained before that. */
+/**
+ * The child could not be run, waited on or finished in time: [detail] in words, and the stderr drained before that.
+ * [stoppedPid] is the child killed at the deadline, so a caller can say "ran too long" apart from "could not start".
+ */
 class ProcessException(
     val detail: String,
     val stderr: ByteArray,
+    val stoppedPid: Int? = null,
 ) : Exception(detail)
 
 /** How long the pipes may still drain once the child has ended or been killed. */
@@ -123,7 +127,7 @@ private class Run(
             drain(maxOf(deadline, TimeSource.Monotonic.markNow() + DRAIN))
             return when (ended) {
                 is Ended.Done -> Output(ended.status, out.take(), err.take())
-                is Ended.Failed -> throw ProcessException(ended.detail, err.take())
+                is Ended.Failed -> throw ProcessException(ended.detail, err.take(), ended.stoppedPid)
             }
         } finally {
             out.close()
@@ -138,6 +142,7 @@ private class Run(
 
         class Failed(
             val detail: String,
+            val stoppedPid: Int? = null,
         ) : Ended
     }
 
@@ -184,7 +189,7 @@ private class Run(
             if (deadline.hasPassedNow()) {
                 killTree(pid)
                 reap(pid)
-                return Ended.Failed("did not answer within ${timeout.inWholeSeconds}s and was stopped")
+                return Ended.Failed("did not answer within ${timeout.inWholeSeconds}s and was stopped", pid)
             }
             pump(POLL)
         }

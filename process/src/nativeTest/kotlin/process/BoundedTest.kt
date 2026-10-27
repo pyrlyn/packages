@@ -3,6 +3,8 @@ package process
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -57,7 +59,14 @@ class BoundedTest {
         val e = assertFailsWith<ProcessException> { sh("echo late >&2; sleep 30").runBounded(300.milliseconds, 1024) }
         assertTrue(started.elapsedNow() < 10.seconds, "waited the child out instead of stopping it")
         assertTrue("was stopped" in e.detail, e.detail)
+        assertNotNull(e.stoppedPid)
         assertEquals("late\n", e.stderr.decodeToString())
+    }
+
+    @Test
+    fun aChildThatCannotStartNamesNoStoppedPid() {
+        val e = assertFailsWith<ProcessException> { Command("/nonexistent/ketch-kit-test", emptyList()).runBounded(5.seconds, 1024) }
+        assertNull(e.stoppedPid, e.detail)
     }
 
     @Test
