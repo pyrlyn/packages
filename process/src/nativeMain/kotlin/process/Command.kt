@@ -22,21 +22,28 @@ class Command(
     /** Variables of this process's environment the child does not get. */
     val removedEnv: Set<String> get() = unset
 
-    /** Set [key] to [value] in the child's environment. */
+    /** Set [key] to [value] in the child's environment; on Windows it replaces a variable of any case. */
     fun env(
         key: String,
         value: String,
     ) = apply {
-        unset -= key
+        forget(key)
         extraEnv[key] = value
     }
 
     /** Leave [key] out of the child's environment (Rust `Command::env_remove`). */
     fun envRemove(key: String) =
         apply {
-            extraEnv -= key
+            forget(key)
             unset += key
         }
+
+    /** The last of `env` and `envRemove` for a name wins, the name compared as the system compares it. */
+    private fun forget(key: String) {
+        val k = envKey(key)
+        extraEnv.keys.removeAll { envKey(it) == k }
+        unset.removeAll { envKey(it) == k }
+    }
 
     /** Read the child's stdin from [path] when it runs under `runBounded`. */
     fun stdinFrom(path: String) = apply { stdin = path }

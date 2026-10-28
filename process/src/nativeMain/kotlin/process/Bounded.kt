@@ -1,43 +1,8 @@
 // A child run under three guards: no stdin but a file the caller names, output capped, and a deadline after which its whole process tree is
 // killed. A command a file or a plugin supplies is untrusted; without these, one that waits on input, prints forever
 // or never exits takes the caller down with it.
-@file:OptIn(ExperimentalForeignApi::class)
-
 package process
 
-import kotlinx.cinterop.ByteVar
-import kotlinx.cinterop.CPointer
-import kotlinx.cinterop.CPointerVar
-import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.IntVar
-import kotlinx.cinterop.addressOf
-import kotlinx.cinterop.alloc
-import kotlinx.cinterop.allocArray
-import kotlinx.cinterop.allocArrayOf
-import kotlinx.cinterop.convert
-import kotlinx.cinterop.cstr
-import kotlinx.cinterop.get
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.ptr
-import kotlinx.cinterop.set
-import kotlinx.cinterop.toKString
-import kotlinx.cinterop.usePinned
-import kotlinx.cinterop.value
-import platform.posix.EINTR
-import platform.posix.POLLIN
-import platform.posix.SIGKILL
-import platform.posix.WNOHANG
-import platform.posix.close
-import platform.posix.errno
-import platform.posix.kill
-import platform.posix.poll
-import platform.posix.pollfd
-import platform.posix.read
-import platform.posix.usleep
-import platform.posix.waitpid
-import process.spawn.kit_environ
-import process.spawn.kit_pipe
-import process.spawn.kit_spawn
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -57,35 +22,52 @@ class ProcessException(
     val detail: String,
     val stderr: ByteArray,
     val stoppedPid: Int? = null,
-) : Exception(detail)
+    cause: Throwable? = null,
+) : Exception(detail, cause)
 
 /** How long the pipes may still drain once the child has ended or been killed. */
-private val DRAIN = 500.milliseconds
+internal val DRAIN = 500.milliseconds
 
 /** How often a running child is checked on. */
-private val POLL = 20.milliseconds
+internal val POLL = 20.milliseconds
 
 private const val READ_CHUNK = 64 * 1024
 
 /**
  * Run the command with no stdin, keep at most [maxOutput] bytes (plus one) of each stream, and kill its whole process
- * group if it outlives [timeout]. Throws [ProcessException] when it cannot be started, waited on, or ends in time.
+ * tree if it outlives [timeout]. Throws [ProcessException] when it cannot be started, waited on, or ends in time.
  */
 fun Command.runBounded(
     timeout: Duration,
     maxOutput: Long,
 ): Output = Run(this, timeout, maxOutput + 1).run()
 
+/** The failure to start [command], as Rust words it. */
+internal fun cannotRun(
+    command: Command,
+    why: String,
+    cause: Throwable? = null,
+) = ProcessException("could not run ${command.program}: $why", ByteArray(0), cause = cause)
+
 private class Stream(
-    var fd: Int,
+    private val source: Source,
     private val cap: Long,
 ) {
     private var bytes = ByteArray(0)
     private var size = 0
 
-    val open get() = fd >= 0
+    var open = true
+        private set
 
-    fun append(
+    fun read(buf: ByteArray) {
+        val n = source.read(buf)
+        when {
+            n > 0 -> append(buf, n)
+            n == 0 -> close()
+        }
+    }
+
+    private fun append(
         chunk: ByteArray,
         n: Int,
     ) {
@@ -98,32 +80,35 @@ private class Stream(
     }
 
     fun close() {
-        if (fd >= 0) close(fd)
-        fd = -1
+        if (open) source.close()
+        open = false
     }
 
     fun take() = bytes.copyOf(size)
+
+    val handle get() = source
 }
 
 private class Run(
     private val command: Command,
     private val timeout: Duration,
-    cap: Long,
+    private val cap: Long,
 ) {
     private val deadline = TimeSource.Monotonic.markNow() + timeout
-    private val out = Stream(-1, cap)
-    private val err = Stream(-1, cap)
     private val buf = ByteArray(READ_CHUNK)
 
     fun run(): Output {
-        val pid = spawn()
+        val piped = spawnPiped(command)
+        val child = piped.child
+        val out = Stream(piped.out, cap)
+        val err = Stream(piped.err, cap)
         try {
-            val ended = awaitEnd(pid)
+            val ended = awaitEnd(child, out, err)
             // A child may exit while a grandchild still holds a pipe; killing only the child would leave the
             // pipes open past the deadline.
-            killTree(pid)
+            child.killTree()
             // On a timeout the deadline is already past; the short grace still lets the last of stderr through.
-            drain(maxOf(deadline, TimeSource.Monotonic.markNow() + DRAIN))
+            drain(maxOf(deadline, TimeSource.Monotonic.markNow() + DRAIN), out, err)
             return when (ended) {
                 is Ended.Done -> Output(ended.status, out.take(), err.take())
                 is Ended.Failed -> throw ProcessException(ended.detail, err.take(), ended.stoppedPid)
@@ -131,162 +116,70 @@ private class Run(
         } finally {
             out.close()
             err.close()
+            child.close()
         }
-    }
-
-    private sealed interface Ended {
-        class Done(
-            val status: ExitStatus,
-        ) : Ended
-
-        class Failed(
-            val detail: String,
-            val stoppedPid: Int? = null,
-        ) : Ended
-    }
-
-    private fun spawn(): Int =
-        memScoped {
-            val outPipe = allocArray<IntVar>(2)
-            val errPipe = allocArray<IntVar>(2)
-            failIfSet(kit_pipe(outPipe))
-            out.fd = outPipe[0]
-            val errRc = kit_pipe(errPipe)
-            if (errRc != 0) {
-                close(outPipe[1])
-                failIfSet(errRc)
-            }
-            err.fd = errPipe[0]
-            val argv = allocArrayOf((listOf(command.program) + command.args).map { it.cstr.ptr } + listOf(null))
-            val envp = if (command.inheritsEnv) kit_environ() else allocArrayOf(command.mergedEnv().map { it.cstr.ptr } + listOf(null))
-            val pid = alloc<IntVar>()
-            val rc = kit_spawn(pid.ptr, command.program, argv, envp, command.dir, command.stdin, outPipe[1], errPipe[1])
-            // The child has its copies; the parent keeping the write ends would never see end of file.
-            close(outPipe[1])
-            close(errPipe[1])
-            failIfSet(rc)
-            pid.value
-        }
-
-    private fun failIfSet(rc: Int) {
-        if (rc == 0) return
-        out.close()
-        err.close()
-        throw ProcessException("could not run ${command.program}: ${osError(rc)}", ByteArray(0))
     }
 
     /** Read the pipes until the child ends, is killed at the deadline, or cannot be waited on. */
-    private fun awaitEnd(pid: Int): Ended {
+    private fun awaitEnd(
+        child: Child,
+        out: Stream,
+        err: Stream,
+    ): Ended {
         while (true) {
-            when (val waited = tryWait(pid)) {
-                null -> {}
-
-                else -> {
-                    return waited
-                }
-            }
+            val waited = child.tryWait()
+            if (waited is Ended.Failed) child.killTree()
+            if (waited != null) return waited
             if (deadline.hasPassedNow()) {
-                killTree(pid)
-                reap(pid)
-                return Ended.Failed("did not answer within ${timeout.inWholeSeconds}s and was stopped", pid)
+                child.killTree()
+                child.reap()
+                return Ended.Failed("did not answer within ${timeout.inWholeSeconds}s and was stopped", child.pid)
             }
-            pump(POLL)
+            pump(POLL, out, err)
         }
     }
 
-    private fun tryWait(pid: Int): Ended? =
-        memScoped {
-            val status = alloc<IntVar>()
-            val rc = waitpid(pid, status.ptr, WNOHANG)
-            when {
-                rc == pid -> Ended.Done(ExitStatus.of(status.value))
-                rc == 0 || (rc < 0 && errno == EINTR) -> null
-                else -> Ended.Failed("could not be waited on: ${osError(errno)}").also { killTree(pid) }
-            }
-        }
-
-    /** After the kill, give the child a moment to be reaped so it does not linger as a zombie. */
-    private fun reap(pid: Int) {
-        val giveUp = TimeSource.Monotonic.markNow() + DRAIN
-        while (!giveUp.hasPassedNow()) {
-            if (memScoped { waitpid(pid, alloc<IntVar>().ptr, WNOHANG) } != 0) return
-            usleep(POLL.inWholeMicroseconds.convert())
-        }
-    }
-
-    private fun drain(until: TimeSource.Monotonic.ValueTimeMark) {
-        while ((out.open || err.open) && !until.hasPassedNow()) pump(minOf(POLL, until.elapsedNow().unaryMinus()))
+    private fun drain(
+        until: TimeSource.Monotonic.ValueTimeMark,
+        out: Stream,
+        err: Stream,
+    ) {
+        while ((out.open || err.open) && !until.hasPassedNow()) pump(minOf(POLL, until.elapsedNow().unaryMinus()), out, err)
     }
 
     /** Wait up to [wait] for either pipe, and read what it has. */
-    private fun pump(wait: Duration) {
-        val streams = listOf(out, err).filter { it.open }
+    private fun pump(
+        wait: Duration,
+        vararg all: Stream,
+    ) {
+        val streams = all.filter { it.open }
         val ms = wait.inWholeMilliseconds.coerceAtLeast(0).toInt()
         if (streams.isEmpty()) {
-            usleep((ms * MICROS_PER_MILLI).convert())
+            sleepMillis(ms)
             return
         }
-        memScoped {
-            val fds = allocArray<pollfd>(streams.size)
-            streams.forEachIndexed { i, s ->
-                fds[i].fd = s.fd
-                fds[i].events = POLLIN.convert()
-                fds[i].revents = 0
-            }
-            if (poll(fds, streams.size.convert(), ms) <= 0) return
-            streams.forEachIndexed { i, s -> if (fds[i].revents.toInt() != 0) readInto(s) }
-        }
-    }
-
-    private fun readInto(stream: Stream) {
-        val n = buf.usePinned { read(stream.fd, it.addressOf(0), buf.size.convert()) }.toInt()
-        when {
-            n > 0 -> {
-                stream.append(buf, n)
-            }
-
-            n < 0 && errno == EINTR -> {}
-
-            else -> {
-                stream.close()
-            }
-        }
-    }
-
-    companion object {
-        const val MICROS_PER_MILLI = 1000
+        ready(streams.map { it.handle }, ms).forEachIndexed { i, now -> if (now) streams[i].read(buf) }
     }
 }
-
-/** Stop the child and everything it started: the group first, then the child itself in case it left the group. */
-private fun killTree(pid: Int) {
-    if (pid <= 0) return
-    kill(-pid, SIGKILL)
-    kill(pid, SIGKILL)
-}
-
-/** This process's environment as `KEY=value` entries, [extra] set on top (Rust `Command::env`). */
 
 /** Whether the child gets this process's environment unchanged. */
 internal val Command.inheritsEnv get() = env.isEmpty() && removedEnv.isEmpty()
 
-internal fun Command.mergedEnv(): List<String> =
-    buildList {
+/** This process's environment with the command's removals and settings on top (Rust `Command::env`). */
+internal fun Command.mergedEnv(): List<String> {
+    val set = env.keys.mapTo(HashSet(), ::envKey)
+    val removed = removedEnv.mapTo(HashSet(), ::envKey)
+    return buildList {
         for (entry in environEntries()) {
-            val key = entry.substringBefore('=')
-            if (key !in env && key !in removedEnv) add(entry)
+            val key = envKey(nameOf(entry))
+            if (key !in set && key !in removed) add(entry)
         }
         env.forEach { (k, v) -> add("$k=$v") }
     }
+}
 
 /** This process's environment, in its order (Rust `std::env::vars`); an entry without `=` is a name with no value. */
-fun envVars(): List<Pair<String, String>> = environEntries().map { it.substringBefore('=') to it.substringAfter('=', "") }
+fun envVars(): List<Pair<String, String>> = environEntries().map { nameOf(it) to it.substring(minOf(nameOf(it).length + 1, it.length)) }
 
-private fun environEntries(): List<String> =
-    buildList {
-        val inherited: CPointer<CPointerVar<ByteVar>>? = kit_environ()
-        var i = 0
-        while (inherited != null) add(inherited[i++]?.toKString() ?: break)
-    }
-
-/** An errno worded as Rust prints an OS error: `No such file or directory (os error 2)`. */
+/** An entry's name: up to the first `=` after the first character, since Windows names such as `=C:` start with one. */
+internal fun nameOf(entry: String): String = entry.indexOf('=', startIndex = 1).let { if (it < 0) entry else entry.substring(0, it) }
