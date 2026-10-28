@@ -1,18 +1,13 @@
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
-
 package archive
 
-import kotlinx.cinterop.cstr
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.toKString
 import kotlinx.io.Buffer
 import kotlinx.io.RawSource
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.files.SystemTemporaryDirectory
 import kotlinx.io.readByteArray
-import platform.posix.getenv
-import platform.posix.mkdtemp
+import kotlin.random.Random
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
@@ -44,8 +39,8 @@ fun <T> withFile(
     bytes: ByteArray,
     body: (Path) -> T,
 ): T {
-    val base = (getenv("TMPDIR")?.toKString() ?: "/tmp").trimEnd('/')
-    val dir = memScoped { Path(checkNotNull(mkdtemp("$base/archive-test-XXXXXX".cstr.ptr)).toKString()) }
+    val dir = Path(SystemTemporaryDirectory, "archive-test-${Random.nextLong().toULong().toString(36)}")
+    SystemFileSystem.createDirectories(dir, mustCreate = true)
     val file = Path(dir, "archive")
     SystemFileSystem.sink(file).buffered().use { it.write(bytes) }
     try {

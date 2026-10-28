@@ -78,7 +78,7 @@ fun crc32(
     if (length == 0) {
         crc
     } else {
-        bytes.usePinned { crc32(crc.convert(), it.addressOf(offset).reinterpret(), length.convert()).toUInt() }
+        bytes.usePinned { crc32(crc.convert(), it.addressOf(offset).reinterpret(), length.convert()).convert<UInt>() }
     }
 
 private fun newStream(): z_stream {
