@@ -29,4 +29,9 @@ class TempDirTest {
             assertEquals(FsException.Kind.NotFound, err.kind)
         }
     }
+
+    @Test
+    fun aNewTempDirIsMadeInTheSystemTempDir() {
+        TempDir.create().use { assertEquals(canon(systemTempDir()), canon(it.path).parent) }
+    }
 }

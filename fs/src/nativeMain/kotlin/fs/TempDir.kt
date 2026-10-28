@@ -3,6 +3,9 @@ package fs
 import kotlinx.io.files.Path
 import kotlin.random.Random
 
+/** Rust `env::temp_dir`: `TMPDIR` or `/tmp` on Unix, GetTempPathW on Windows. Nothing is created. */
+fun systemTempDir(): Path = tempRoot()
+
 /** Rust `tempfile::TempDir`: a fresh directory under the system's temp directory, removed with everything in it on [close]. */
 class TempDir private constructor(
     val path: Path,
