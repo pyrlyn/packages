@@ -67,6 +67,7 @@ class Arg internal constructor(
     val global = b.global
     val hidden = b.hidden
     val default = b.default
+    val allowHyphenValues = b.allowHyphenValues
     internal val action = b.action
 
     internal val possibleValues: List<PossibleValue> get() = (value as? ValueKind.OneOf)?.values.orEmpty()
@@ -90,6 +91,9 @@ class Command internal constructor(
 
     /** Every subcommand shows the root's version, as clap's `propagate_version`. */
     val propagateVersion = b.propagateVersion
+
+    /** No `-h`/`--help` of its own, as clap's `disable_help_flag`; its errors then point at no help either. */
+    val disableHelpFlag = b.disableHelpFlag
 }
 
 @DslMarker
@@ -116,6 +120,9 @@ class ArgBuilder internal constructor(
 
     /** Shown in help as `[default: …]` and read when the argument is absent; never counts as given. */
     var default: String? = null
+
+    /** A word that looks like a flag this command does not have is taken as a value, as clap's `allow_hyphen_values`. */
+    var allowHyphenValues = false
     internal val requiredUnlessPresent = mutableListOf<String>()
     internal val conflictsWith = mutableListOf<String>()
     internal val requires = mutableListOf<String>()
@@ -151,6 +158,7 @@ class CommandBuilder internal constructor(
     var hidden = false
     var subcommandRequired = false
     var propagateVersion = false
+    var disableHelpFlag = false
     internal val aliases = mutableListOf<String>()
     internal val args = mutableListOf<Arg>()
     internal val subcommands = mutableListOf<Command>()

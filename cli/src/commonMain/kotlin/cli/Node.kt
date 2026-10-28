@@ -32,7 +32,8 @@ internal class Node(
             userArgs.any { arg -> !arg.hidden && (arg.longHelp != null || arg.possibleValues.any { !it.hidden && it.help != null }) }
 
     /** In the order help lists them: own, inherited globals, help, version. */
-    val args: List<Arg> = userArgs + helpArg(longHelpExists) + listOfNotNull(version?.let { versionArg() })
+    val args: List<Arg> =
+        userArgs + listOfNotNull(helpArg(longHelpExists).takeUnless { cmd.disableHelpFlag }, version?.let { versionArg() })
 
     val positionals: List<Arg> = args.filter { it.positional }
 

@@ -63,6 +63,10 @@ internal class Parser(
                 return sub
             }
 
+            hyphenValue(token) -> {
+                if (wantsValue) pending?.values?.add(token) else positional(token)
+            }
+
             token == "--" -> {
                 trailing = true
                 resolve()
@@ -86,6 +90,24 @@ internal class Parser(
         }
         return null
     }
+
+    /**
+     * clap's `MaybeHyphenValue`: a dash word read as a value. Either the argument waiting for values takes hyphens, or
+     * the next positional does and the word names a flag this command lacks. `--` stays the escape either way.
+     */
+    private fun hyphenValue(token: String): Boolean {
+        val prior = pending?.let { it.arg.allowHyphenValues && (it.arg.positional || it.values.isEmpty()) } == true
+        val next = node.positionals.getOrNull(positional)?.allowHyphenValues == true
+        return token.length > 1 && token.startsWith("-") && token != "--" && (prior || (next && !known(token)))
+    }
+
+    /** Whether every flag a dash word names is one this command has: the long name, or each short in a cluster. */
+    private fun known(token: String): Boolean =
+        if (token.startsWith("--")) {
+            node.byLong(token.substring(2).substringBefore('=')) != null
+        } else {
+            token.substring(1).all { node.byShort(it) != null }
+        }
 
     private fun long(body: String) {
         val eq = body.indexOf('=')
@@ -236,7 +258,10 @@ internal class Parser(
             }
 
             else -> {
-                errors.unknownArgument(token, emptyList(), Usage(node, ctx.style).normal())
+                // A dash word lands here only as a hyphen value with no positional left; clap still says how to pass it.
+                val flagLike = !trailing && token.length > 1 && token.startsWith("-") && token != "--"
+                val tips = if (flagLike && node.positionals.isNotEmpty()) listOf(errors.trailingTip(token)) else emptyList()
+                errors.unknownArgument(token, tips, Usage(node, ctx.style).normal())
             }
         }
     }

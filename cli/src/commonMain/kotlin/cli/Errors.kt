@@ -38,7 +38,8 @@ internal class Errors(
                 .append(' ')
                 .append(it)
         }
-        sb.append("\n\nFor more information, try '").append(style.literal("--help")).append("'.\n")
+        if (!node.cmd.disableHelpFlag) sb.append("\n\nFor more information, try '").append(style.literal("--help")).append("'.")
+        sb.append('\n')
         return Stop(sb.toString(), stderr = true, code = USAGE_EXIT)
     }
 
