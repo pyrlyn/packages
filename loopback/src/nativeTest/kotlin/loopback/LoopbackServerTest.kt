@@ -1,26 +1,5 @@
-@file:OptIn(ExperimentalForeignApi::class)
-
 package loopback
 
-import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.addressOf
-import kotlinx.cinterop.alloc
-import kotlinx.cinterop.convert
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.ptr
-import kotlinx.cinterop.reinterpret
-import kotlinx.cinterop.sizeOf
-import kotlinx.cinterop.usePinned
-import platform.posix.AF_INET
-import platform.posix.SOCK_STREAM
-import platform.posix.close
-import platform.posix.connect
-import platform.posix.posix_htons
-import platform.posix.read
-import platform.posix.sockaddr
-import platform.posix.sockaddr_in
-import platform.posix.socket
-import platform.posix.write
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -31,27 +10,20 @@ class LoopbackServerTest {
         port: Int,
         request: String,
     ): String {
-        val fd = socket(AF_INET, SOCK_STREAM, 0)
+        val socket = connectLoopback(port)
         try {
-            memScoped {
-                val addr = alloc<sockaddr_in>()
-                addr.sin_family = AF_INET.convert()
-                addr.sin_port = posix_htons(port.toShort()).toUShort()
-                setLoopback(addr)
-                check(connect(fd, addr.ptr.reinterpret<sockaddr>(), sizeOf<sockaddr_in>().convert()) == 0) { "connect" }
-            }
             val bytes = request.encodeToByteArray()
-            bytes.usePinned { write(fd, it.addressOf(0), bytes.size.convert()) }
+            sendFrom(socket, bytes, 0)
             var got = ByteArray(0)
             val buf = ByteArray(4096)
             while (true) {
-                val n = buf.usePinned { read(fd, it.addressOf(0), buf.size.convert()).toInt() }
+                val n = receive(socket, buf)
                 if (n <= 0) break
                 got += buf.copyOf(n)
             }
             return got.decodeToString()
         } finally {
-            close(fd)
+            closeSocket(socket)
         }
     }
 
