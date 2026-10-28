@@ -272,14 +272,21 @@ internal val Command.inheritsEnv get() = env.isEmpty() && removedEnv.isEmpty()
 
 internal fun Command.mergedEnv(): List<String> =
     buildList {
-        val inherited: CPointer<CPointerVar<ByteVar>>? = kit_environ()
-        var i = 0
-        while (inherited != null) {
-            val entry = inherited[i++]?.toKString() ?: break
+        for (entry in environEntries()) {
             val key = entry.substringBefore('=')
             if (key !in env && key !in removedEnv) add(entry)
         }
         env.forEach { (k, v) -> add("$k=$v") }
+    }
+
+/** This process's environment, in its order (Rust `std::env::vars`); an entry without `=` is a name with no value. */
+fun envVars(): List<Pair<String, String>> = environEntries().map { it.substringBefore('=') to it.substringAfter('=', "") }
+
+private fun environEntries(): List<String> =
+    buildList {
+        val inherited: CPointer<CPointerVar<ByteVar>>? = kit_environ()
+        var i = 0
+        while (inherited != null) add(inherited[i++]?.toKString() ?: break)
     }
 
 /** An errno worded as Rust prints an OS error: `No such file or directory (os error 2)`. */

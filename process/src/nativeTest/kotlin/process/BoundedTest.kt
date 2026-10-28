@@ -49,6 +49,12 @@ class BoundedTest {
     }
 
     @Test
+    fun envVarsListsThisProcesssEnvironment() {
+        val path = platform.posix.getenv("PATH")?.toKString()
+        assertEquals(path, envVars().firstOrNull { it.first == "PATH" }?.second)
+    }
+
+    @Test
     fun stdinComesFromTheNamedFile() {
         val input = "${platform.posix.getenv("TMPDIR")?.toKString() ?: "/tmp"}/kit-process-stdin-${platform.posix.getpid()}"
         sh("printf 'typed ahead\\n' > \"\$0\"").let { Command(it.program, it.args + input) }.run()
