@@ -62,6 +62,13 @@ fun linkMode(path: Path): Int? =
         if (lstat(path.toString(), st.ptr) == 0) st.st_mode.toInt() and MODE_BITS else null
     }
 
+/** The size of [path] itself, a link not followed (Rust `DirEntry::metadata().len()`); null when missing. */
+fun linkSize(path: Path): Long? =
+    memScoped {
+        val st = alloc<stat>()
+        if (lstat(path.toString(), st.ptr) == 0) st.st_size else null
+    }
+
 private fun statMode(path: Path): Int? =
     memScoped {
         val st = alloc<stat>()

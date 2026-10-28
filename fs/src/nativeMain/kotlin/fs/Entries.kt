@@ -18,6 +18,7 @@ import platform.posix.O_EXCL
 import platform.posix.O_WRONLY
 import platform.posix.chmod
 import platform.posix.close
+import platform.posix.fsync
 import platform.posix.link
 import platform.posix.mkdir
 import platform.posix.open
@@ -31,15 +32,20 @@ import kotlin.time.Duration.Companion.nanoseconds
 /** Rust's default mode for a new file, before the umask. */
 private const val NEW_FILE_MODE = 0b110_110_110
 
-/** Create [path] holding [bytes], failing with [FsException.Kind.AlreadyExists] rather than replacing it (Rust `create_new`). */
+/**
+ * Create [path] holding [bytes], failing with [FsException.Kind.AlreadyExists] rather than replacing it (Rust
+ * `create_new`). [durable] fsyncs the bytes before the file is closed (Rust `sync_all`).
+ */
 fun createNew(
     path: Path,
     bytes: ByteArray,
+    durable: Boolean = false,
 ) {
     val fd = retry { open(path.toString(), O_WRONLY or O_CREAT or O_EXCL or O_CLOEXEC, NEW_FILE_MODE) }
     ensure(fd >= 0, path)
     try {
         writeAll(fd, bytes, path)
+        if (durable) ensure(fsync(fd) == 0, path)
     } finally {
         close(fd)
     }
