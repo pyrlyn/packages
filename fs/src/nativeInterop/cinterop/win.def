@@ -4,6 +4,7 @@ package = fs.win
 // be gone: returning from a native call may park the thread for the collector, and the runtime's own Win32 calls
 // there overwrite the last error.
 #include <windows.h>
+#include <stddef.h>
 
 static __thread DWORD kit_err;
 
@@ -34,6 +35,43 @@ static inline BOOL kit_ReadFile(HANDLE h, LPVOID buf, DWORD size, LPDWORD got) {
 static inline BOOL kit_WriteFile(HANDLE h, LPCVOID buf, DWORD size, LPDWORD put) { KIT_KEEP(WriteFile(h, buf, size, put, NULL)); }
 static inline BOOL kit_FlushFileBuffers(HANDLE h) { KIT_KEEP(FlushFileBuffers(h)); }
 static inline BOOL kit_MoveFileExW(LPCWSTR from, LPCWSTR to, DWORD flags) { KIT_KEEP(MoveFileExW(from, to, flags)); }
+// Rust `fs::rename`'s fallback when MoveFileExW is refused: a rename by handle with POSIX semantics, which replaces
+// a target another process has open. Older MinGW headers lack the Ex class and its flags; the values are Windows'.
+#ifndef FILE_RENAME_FLAG_REPLACE_IF_EXISTS
+#define FILE_RENAME_FLAG_REPLACE_IF_EXISTS 0x1
+#endif
+#ifndef FILE_RENAME_FLAG_POSIX_SEMANTICS
+#define FILE_RENAME_FLAG_POSIX_SEMANTICS 0x2
+#endif
+#define KIT_FILE_RENAME_INFO_EX ((FILE_INFO_BY_HANDLE_CLASS) 22)
+static inline BOOL kit_rename_posix(LPCWSTR from, LPCWSTR to) {
+    // The rename takes a full path with backslashes only: below Win32, nothing turns a slash into a backslash.
+    DWORD full = GetFullPathNameW(to, 0, NULL, NULL);
+    if (full == 0) { kit_err = GetLastError(); return FALSE; }
+    DWORD name = (full - 1) * sizeof(WCHAR);
+    DWORD size = (DWORD) offsetof(FILE_RENAME_INFO, FileName) + name + sizeof(WCHAR);
+    FILE_RENAME_INFO* info = (FILE_RENAME_INFO*) HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
+    if (info == NULL) { kit_err = ERROR_NOT_ENOUGH_MEMORY; return FALSE; }
+    BOOL ok = FALSE;
+    if (GetFullPathNameW(to, full, info->FileName, NULL) == full - 1) {
+        // The flags share the first field with the older ReplaceIfExists, which some headers name alone.
+        *(DWORD*) info = FILE_RENAME_FLAG_REPLACE_IF_EXISTS | FILE_RENAME_FLAG_POSIX_SEMANTICS;
+        info->FileNameLength = name;
+        HANDLE h = CreateFileW(from, DELETE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING,
+            FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, NULL);
+        if (h != INVALID_HANDLE_VALUE) {
+            ok = SetFileInformationByHandle(h, KIT_FILE_RENAME_INFO_EX, info, size);
+            kit_err = GetLastError();
+            CloseHandle(h);
+        } else {
+            kit_err = GetLastError();
+        }
+    } else {
+        kit_err = GetLastError();
+    }
+    HeapFree(GetProcessHeap(), 0, info);
+    return ok;
+}
 static inline BOOL kit_DeleteFileW(LPCWSTR name) { KIT_KEEP(DeleteFileW(name)); }
 static inline BOOL kit_RemoveDirectoryW(LPCWSTR name) { KIT_KEEP(RemoveDirectoryW(name)); }
 static inline DWORD kit_GetFileAttributesW(LPCWSTR name) { KIT_KEEP(GetFileAttributesW(name)); }

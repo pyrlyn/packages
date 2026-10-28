@@ -16,6 +16,7 @@ import fs.win.kit_SetFileAttributesW
 import fs.win.kit_SetFileTime
 import fs.win.kit_WriteFile
 import fs.win.kit_last_error
+import fs.win.kit_rename_posix
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
@@ -30,6 +31,8 @@ import kotlinx.io.files.Path
 import platform.windows.CREATE_ALWAYS
 import platform.windows.CREATE_NEW
 import platform.windows.DWORDVar
+import platform.windows.ERROR_ACCESS_DENIED
+import platform.windows.ERROR_DIR_NOT_EMPTY
 import platform.windows.FILETIME
 import platform.windows.FILE_ATTRIBUTE_DIRECTORY
 import platform.windows.FILE_ATTRIBUTE_NORMAL
@@ -97,11 +100,25 @@ private class FileHandle(
     }
 }
 
-/** Rust `fs::rename`: a file at [to] is replaced. */
+/**
+ * Rust `fs::rename`: a file at [to] is replaced. MoveFileExW refuses while another process has [to] open; the POSIX
+ * rename Rust then tries does not.
+ */
 internal actual fun renameEntry(
     from: Path,
     to: Path,
-) = kit_MoveFileExW(from.win, to.win, MOVEFILE_REPLACE_EXISTING.convert()) != 0 || failedFalse()
+): Boolean {
+    if (kit_MoveFileExW(from.win, to.win, MOVEFILE_REPLACE_EXISTING.convert()) != 0) return true
+    val code = kit_last_error().toInt()
+    return if (code == ERROR_ACCESS_DENIED) renamePosix(from, to, code) else failedFalse(code)
+}
+
+/** The retry's own failure is reported only for a full directory, as in Rust; otherwise MoveFileExW's [moveError]. */
+private fun renamePosix(
+    from: Path,
+    to: Path,
+    moveError: Int,
+): Boolean = kit_rename_posix(from.win, to.win) != 0 || failedFalse(kit_last_error().toInt().takeIf { it == ERROR_DIR_NOT_EMPTY } ?: moveError)
 
 /** A link to a directory is a directory entry on Windows; it goes with RemoveDirectoryW, its target untouched. */
 internal actual fun unlinkEntry(path: Path): Boolean {
