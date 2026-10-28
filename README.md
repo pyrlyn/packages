@@ -1,6 +1,6 @@
 # kotlin-kit
 
-Small Kotlin/Native libraries shared by several projects: command lines, files, archives, TOML, YAML, semver, HTTP, SQLite and child processes.
+Small Kotlin/Native libraries shared by several projects: command lines, status-line icons, files, archives, TOML, YAML, semver, HTTP, SQLite and child processes.
 They started as rtok-kotlin's `libs/` and are shared so that projects read and write the same
 formats the same way.
 
@@ -15,6 +15,7 @@ formats the same way.
 | `pyrlyn.kit:toml-aot` | `tomlaot` | `TomlDoc`: a TOML editor that keeps comments and layout |
 | `pyrlyn.kit:yaml-aot` | `yamlaot` | `Yaml.parse` into `YamlValue`, `YamlText` scalar writing |
 | `pyrlyn.kit:semver` | `semver` | `VersionKey`: version ordering |
+| `pyrlyn.kit:icons` | `icons` | `icon`, `iconIn`, `OPERATION_ICONS`, `ICON_WIDTH`, `padding`, `gutter`, `displayWidth`: icons for what a status-line verb is doing and the fixed-width gutter they sit in (port of Rust operation-icons), with the terminal column count unicode-width gives a string |
 | `pyrlyn.kit:http` | `http` | `HttpClient`, `HttpRequest`, `HttpResponse`, `HttpSettings`, `HttpException`; `HttpClient.stream` with `HttpHead` and `HttpBody` for a GET whose body is read as it arrives |
 | `pyrlyn.kit:http-ktor` | `http.ktor` | `KtorHttp` over the [Ktor](https://github.com/ktorio/ktor) client (Darwin, Curl) |
 | `pyrlyn.kit:db` | `db` | `Db`, `DbDriver`, `Row`, `Cursor`, `DbException`: a driver-neutral SQL interface |
