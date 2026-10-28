@@ -1,10 +1,6 @@
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
-
 package fs
 
-import kotlinx.cinterop.convert
 import kotlinx.io.files.Path
-import platform.posix.chmod
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -20,12 +16,12 @@ class FsTest {
             val missing = Path(dir, "nope")
             val err = assertFailsWith<FsException> { readText(missing) }
             assertEquals(FsException.Kind.NotFound, err.kind)
-            assertEquals("$missing: No such file or directory (os error 2)", err.message)
+            assertEquals("$missing: $NOT_FOUND", err.message)
             assertEquals(missing, err.path)
             val bare = err.withoutPath()
             assertNull(bare.path)
             assertEquals(err.errno, bare.errno)
-            assertEquals("No such file or directory (os error 2)", bare.message)
+            assertEquals(NOT_FOUND, bare.message)
         }
 
     @Test
@@ -94,31 +90,35 @@ class FsTest {
 
     @Test
     fun keepsTheOldMode() =
-        withTempDir { dir ->
-            val f = Path(dir, "secret")
-            f.write("old")
-            chmod(f.toString(), "600".toInt(8).convert())
-            f.write("new")
-            assertEquals("600".toInt(8), mode(f))
+        unixModes {
+            withTempDir { dir ->
+                val f = Path(dir, "secret")
+                f.write("old")
+                setMode(f, "600".toInt(8))
+                f.write("new")
+                assertEquals("600".toInt(8), mode(f))
+            }
         }
 
     @Test
     fun modeAppliesToANewFileAndYieldsToAnExistingOne() =
-        withTempDir { dir ->
-            val f = Path(dir, "key")
-            val private = WriteOptions(mode = "600".toInt(8))
-            private.write(f, "k".encodeToByteArray())
-            assertEquals("600".toInt(8), mode(f))
-            chmod(f.toString(), "640".toInt(8).convert())
-            private.write(f, "k2".encodeToByteArray())
-            assertEquals("640".toInt(8), mode(f))
-            private.copy(preservePermissions = false).write(f, "k3".encodeToByteArray())
-            assertEquals("600".toInt(8), mode(f))
+        unixModes {
+            withTempDir { dir ->
+                val f = Path(dir, "key")
+                val private = WriteOptions(mode = "600".toInt(8))
+                private.write(f, "k".encodeToByteArray())
+                assertEquals("600".toInt(8), mode(f))
+                setMode(f, "640".toInt(8))
+                private.write(f, "k2".encodeToByteArray())
+                assertEquals("640".toInt(8), mode(f))
+                private.copy(preservePermissions = false).write(f, "k3".encodeToByteArray())
+                assertEquals("600".toInt(8), mode(f))
+            }
         }
 
     @Test
     fun writesThroughASymlinkAndKeepsIt() =
-        withTempDir { dir ->
+        withLinkDir { dir ->
             val real = Path(dir, "real.json")
             val linked = Path(dir, "link.json")
             real.write("old")
@@ -130,7 +130,7 @@ class FsTest {
 
     @Test
     fun createsTheTargetOfADanglingSymlink() =
-        withTempDir { dir ->
+        withLinkDir { dir ->
             val linked = Path(dir, "link")
             link("missing", linked)
             linked.write("made")
@@ -140,7 +140,7 @@ class FsTest {
 
     @Test
     fun notFollowingReplacesTheLinkItself() =
-        withTempDir { dir ->
+        withLinkDir { dir ->
             val real = Path(dir, "real")
             val linked = Path(dir, "link")
             real.write("old")
@@ -152,7 +152,7 @@ class FsTest {
 
     @Test
     fun symlinkCycleEnds() =
-        withTempDir { dir ->
+        withLinkDir { dir ->
             val a = Path(dir, "a")
             val b = Path(dir, "b")
             link(b.toString(), a)
@@ -163,7 +163,7 @@ class FsTest {
 
     @Test
     fun linksAreKeptOrFollowedAsAsked() =
-        withTempDir { dir ->
+        withLinkDir { dir ->
             val src = Path(dir, "src")
             createDirAll(Path(src, "real"))
             Path(src, "real/f").write("f")
@@ -180,14 +180,16 @@ class FsTest {
 
     @Test
     fun copyTreeKeepsAFilesMode() =
-        withTempDir { dir ->
-            val src = Path(dir, "src")
-            createDirAll(Path(src, "bin"))
-            Path(src, "bin/tool").write("#!/bin/sh\n")
-            chmod(Path(src, "bin/tool").toString(), "755".toInt(8).convert())
-            copyTree(src, Path(dir, "dest"), Links.Follow)
-            assertEquals("755".toInt(8), mode(Path(dir, "dest/bin/tool")))
-            assertEquals("#!/bin/sh\n", Path(dir, "dest/bin/tool").text())
+        unixModes {
+            withTempDir { dir ->
+                val src = Path(dir, "src")
+                createDirAll(Path(src, "bin"))
+                Path(src, "bin/tool").write("#!/bin/sh\n")
+                setMode(Path(src, "bin/tool"), "755".toInt(8))
+                copyTree(src, Path(dir, "dest"), Links.Follow)
+                assertEquals("755".toInt(8), mode(Path(dir, "dest/bin/tool")))
+                assertEquals("#!/bin/sh\n", Path(dir, "dest/bin/tool").text())
+            }
         }
 
     @Test
@@ -204,7 +206,7 @@ class FsTest {
 
     @Test
     fun removeAnyNeverFollowsALinkIntoItsTarget() =
-        withTempDir { dir ->
+        withLinkDir { dir ->
             createDirAll(Path(dir, "keep"))
             Path(dir, "keep/f").write("f")
             link(Path(dir, "keep").toString(), Path(dir, "link"))
@@ -214,7 +216,7 @@ class FsTest {
 
     @Test
     fun canonResolvesLinksAndLeavesAMissingPathAlone() =
-        withTempDir { dir ->
+        withLinkDir { dir ->
             createDirAll(Path(dir, "real"))
             link("real", Path(dir, "link"))
             assertEquals(canonicalize(Path(dir, "real")), canonicalize(Path(dir, "link")))
@@ -222,4 +224,34 @@ class FsTest {
             assertEquals(missing, canon(missing))
             assertEquals(FsException.Kind.NotFound, assertFailsWith<FsException> { canonicalize(missing) }.kind)
         }
+
+    /** fs-kit's Windows test: a replace cannot land on a read-only file, so the read-only bit gives way. */
+    @Test
+    fun replacesAReadOnlyFile() =
+        withTempDir { dir ->
+            val f = Path(dir, "f")
+            f.write("old")
+            setMode(f, "444".toInt(8))
+            f.write("new")
+            assertEquals("new", f.text())
+        }
+
+    @Test
+    fun windowsReportsReadOnlyAsAModeWithoutWriteBits() {
+        if (!onWindows) return
+        withTempDir { dir ->
+            val f = Path(dir, "f")
+            f.write("x")
+            assertEquals("666".toInt(8), mode(f))
+            setMode(f, "444".toInt(8))
+            assertEquals("444".toInt(8), mode(f))
+            setMode(f, "644".toInt(8))
+            assertEquals("666".toInt(8), mode(f))
+            assertEquals("777".toInt(8), mode(dir))
+        }
+    }
 }
+
+/** How Rust prints a missing file's OS error: strerror on Unix, FormatMessageW on Windows. */
+private val NOT_FOUND =
+    if (onWindows) "The system cannot find the file specified. (os error 2)" else "No such file or directory (os error 2)"

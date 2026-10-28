@@ -49,7 +49,7 @@ class BackupTest {
 
     @Test
     fun aPlantedLinkAtTheBackupNameIsSkippedNotFollowed(): Unit =
-        withTempDir { dir ->
+        withLinkDir { dir ->
             val path = Path(dir, "settings.json")
             path.write("secret")
             val victim = Path(dir, "victim")

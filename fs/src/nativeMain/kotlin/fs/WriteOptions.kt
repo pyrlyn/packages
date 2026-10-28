@@ -1,24 +1,8 @@
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class, kotlin.concurrent.atomics.ExperimentalAtomicApi::class)
+@file:OptIn(kotlin.concurrent.atomics.ExperimentalAtomicApi::class)
 
 package fs
 
-import kotlinx.cinterop.convert
 import kotlinx.io.files.Path
-import platform.posix.EEXIST
-import platform.posix.ENOENT
-import platform.posix.O_CLOEXEC
-import platform.posix.O_CREAT
-import platform.posix.O_EXCL
-import platform.posix.O_RDONLY
-import platform.posix.O_WRONLY
-import platform.posix.chmod
-import platform.posix.close
-import platform.posix.errno
-import platform.posix.fsync
-import platform.posix.getpid
-import platform.posix.open
-import platform.posix.rename
-import platform.posix.unlink
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.fetchAndIncrement
 import kotlin.random.Random
@@ -61,27 +45,39 @@ data class WriteOptions(
         if (path.name in NO_FILE_NAMES) throw FsException(null, FsException.Kind.InvalidInput, null, "names no file")
         if (createParent) createDirAll(parentOf(path))
         val target = if (followSymlinks) linkTarget(path) else path
-        val (tmp, fd) = createTemp(target)
+        val (tmp, file) = createTemp(target)
         try {
-            fillAndSwap(target, tmp, fd, bytes)
+            fill(target, tmp, file, bytes)
         } catch (e: FsException) {
-            unlink(tmp.toString())
+            file.close()
+            unlinkEntry(tmp)
             throw e
-        } finally {
-            close(fd)
         }
+        // Windows renames no file that is still open, so the handle is closed first.
+        file.close()
+        swap(target, tmp)
     }
 
-    private fun fillAndSwap(
+    private fun fill(
         target: Path,
         tmp: Path,
-        fd: Int,
+        file: WriteHandle,
         bytes: ByteArray,
     ) {
-        writeAll(fd, bytes, tmp)
+        writeAll(file, bytes, tmp)
         if (preservePermissions) keepPermissions(target, tmp)
-        if (durable && fsync(fd) != 0) throw FsException.ofErrno(null)
-        if (rename(tmp.toString(), target.toString()) != 0) throw FsException.ofErrno(null)
+        if (durable && !file.sync()) throw FsException.ofErrno(null)
+    }
+
+    private fun swap(
+        target: Path,
+        tmp: Path,
+    ) {
+        if (!renameEntry(tmp, target)) {
+            val e = FsException.ofErrno(null)
+            unlinkEntry(tmp)
+            throw e
+        }
         // Best effort: some filesystems refuse to fsync a directory, and the bytes are already safe by then.
         if (durable) syncDir(parentOf(target))
     }
@@ -90,13 +86,13 @@ data class WriteOptions(
      * A fresh temp file beside [target], created exclusively with the pid, a random part and a process-wide counter
      * in its name, so two writers never share a file and a leftover from a crashed run is never reused.
      */
-    private fun createTemp(target: Path): Pair<Path, Int> {
+    private fun createTemp(target: Path): Pair<Path, WriteHandle> {
         val dir = parentOf(target)
         repeat(TEMP_ATTEMPTS) {
-            val tmp = Path(dir, ".${target.name}.tmp-${getpid()}-${Random.nextInt().toUInt()}-${counter.fetchAndIncrement()}")
-            val fd = retry { open(tmp.toString(), O_WRONLY or O_CREAT or O_EXCL or O_CLOEXEC, mode ?: NEW_FILE_MODE) }
-            if (fd >= 0) return tmp to fd
-            if (errno != EEXIST) throw FsException.ofErrno(null)
+            val tmp = Path(dir, ".${target.name}.tmp-${processId()}-${Random.nextInt().toUInt()}-${counter.fetchAndIncrement()}")
+            openWrite(tmp, Create.New, mode ?: NEW_FILE_MODE)?.let { return tmp to it }
+            val code = lastOsError()
+            if (osKind(code) != FsException.Kind.AlreadyExists) throw FsException.ofErrno(null, code)
         }
         throw FsException.other(null, "no free temp file name")
     }
@@ -104,7 +100,6 @@ data class WriteOptions(
     private companion object {
         val counter = AtomicLong(0)
         const val TEMP_ATTEMPTS = 8
-        const val NEW_FILE_MODE = 0b110_110_110
         val NO_FILE_NAMES = setOf("", ".", "..")
     }
 }
@@ -126,13 +121,7 @@ fun ifChanged(
 }
 
 /** Fsync a directory so a rename or create inside it survives a crash; failures are ignored. */
-fun syncDir(dir: Path) {
-    val fd = retry { open(dir.toString(), O_RDONLY or O_CLOEXEC) }
-    if (fd >= 0) {
-        fsync(fd)
-        close(fd)
-    }
-}
+fun syncDir(dir: Path) = syncDirEntry(dir)
 
 /** `Path::parent`, where a bare file name's parent is the current directory. */
 internal fun parentOf(path: Path): Path = path.parent?.takeIf { it.toString().isNotEmpty() } ?: Path(".")
@@ -157,12 +146,21 @@ private fun keepPermissions(
     tmp: Path,
 ) {
     val bits = mode(target)
-    if (bits == null) {
-        if (errno == ENOENT) return
-        throw FsException.ofErrno(null)
-    }
-    if (chmod(tmp.toString(), bits.convert()) != 0) throw FsException.ofErrno(null)
+    // Windows: a replace cannot land on a read-only file, so the target loses that bit and the new file never gets
+    // it (fs-kit's keep_permissions there). Elsewhere the new file takes the target's bits.
+    val ok =
+        when {
+            bits == null -> osKind(lastOsError()) == FsException.Kind.NotFound
+            keepsModeOnReplace -> chmodEntry(tmp, bits)
+            else -> bits and OWNER_WRITE != 0 || chmodEntry(target, bits or OWNER_WRITE)
+        }
+    if (!ok) throw FsException.ofErrno(null)
 }
+
+/** Whether a replaced file's mode carries over to its replacement: false on Windows. */
+internal expect val keepsModeOnReplace: Boolean
+
+private const val OWNER_WRITE = 0b010_000_000
 
 /** The kernel's own ELOOP limit. */
 private const val MAX_LINKS = 40

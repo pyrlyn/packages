@@ -1,15 +1,9 @@
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
-
 package fs
 
-import kotlinx.cinterop.cstr
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.toKString
 import kotlinx.io.files.Path
-import platform.posix.getenv
-import platform.posix.mkdtemp
+import kotlin.random.Random
 
-/** Rust `tempfile::TempDir`: a fresh directory under `$TMPDIR`, removed with everything in it on [close]. */
+/** Rust `tempfile::TempDir`: a fresh directory under the system's temp directory, removed with everything in it on [close]. */
 class TempDir private constructor(
     val path: Path,
 ) : AutoCloseable {
@@ -20,7 +14,7 @@ class TempDir private constructor(
 
     companion object {
         /** Create one named [prefix] and six random characters; fails as [FsException]. */
-        fun create(prefix: String = ".tmp"): TempDir = createIn(Path((getenv("TMPDIR")?.toKString() ?: "/tmp").trimEnd('/')), prefix)
+        fun create(prefix: String = ".tmp"): TempDir = createIn(tempRoot(), prefix)
 
         /**
          * Rust `tempfile::tempdir_in`: the same, inside [dir]. A directory staged next to where its contents end up
@@ -29,9 +23,28 @@ class TempDir private constructor(
         fun createIn(
             dir: Path,
             prefix: String = ".tmp",
-        ): TempDir {
-            val made = memScoped { mkdtemp("$dir/${prefix}XXXXXX".cstr.ptr)?.toKString() }
-            return TempDir(Path(made ?: throw FsException.ofErrno(dir)))
-        }
+        ): TempDir = freshName(dir, prefix) { path -> if (makeDir(path)) TempDir(path) else null }
     }
 }
+
+/**
+ * What [make] creates at the first free name in [dir], [prefix] and six random characters (Rust tempfile's names).
+ * A taken name is tried again; any other failure is an error about [dir].
+ */
+internal inline fun <T : Any> freshName(
+    dir: Path,
+    prefix: String,
+    make: (Path) -> T?,
+): T {
+    repeat(NAME_ATTEMPTS) {
+        val name = prefix + (1..NAME_LENGTH).map { NAME_CHARS[Random.nextInt(NAME_CHARS.length)] }.joinToString("")
+        make(Path(dir, name))?.let { return it }
+        val code = lastOsError()
+        if (osKind(code) != FsException.Kind.AlreadyExists) throw FsException.ofErrno(dir, code)
+    }
+    throw FsException.other(dir, "no free temp file name")
+}
+
+private const val NAME_ATTEMPTS = 8
+private const val NAME_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+private const val NAME_LENGTH = 6

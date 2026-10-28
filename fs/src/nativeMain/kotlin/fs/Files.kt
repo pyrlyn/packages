@@ -1,130 +1,48 @@
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
-
 package fs
 
-import kotlinx.cinterop.ByteVar
-import kotlinx.cinterop.addressOf
-import kotlinx.cinterop.alloc
-import kotlinx.cinterop.allocArray
-import kotlinx.cinterop.convert
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.pointed
-import kotlinx.cinterop.ptr
-import kotlinx.cinterop.readBytes
-import kotlinx.cinterop.toKString
-import kotlinx.cinterop.usePinned
 import kotlinx.io.files.Path
-import platform.posix.EEXIST
-import platform.posix.EINTR
-import platform.posix.O_CLOEXEC
-import platform.posix.O_RDONLY
-import platform.posix.PATH_MAX
-import platform.posix.S_IFDIR
-import platform.posix.S_IFLNK
-import platform.posix.S_IFMT
-import platform.posix.S_IFREG
-import platform.posix.close
-import platform.posix.closedir
-import platform.posix.errno
-import platform.posix.lstat
-import platform.posix.mkdir
-import platform.posix.open
-import platform.posix.opendir
-import platform.posix.read
-import platform.posix.readdir
-import platform.posix.readlink
-import platform.posix.stat
-import platform.posix.write
 
 /** Rust `symlink_metadata().file_type()`; null when nothing, not even a dangling link, is there. */
-fun entryKind(path: Path): EntryKind? =
-    memScoped {
-        val st = alloc<stat>()
-        if (lstat(path.toString(), st.ptr) != 0) return null
-        when (st.st_mode.toInt() and S_IFMT) {
-            S_IFLNK -> EntryKind.Symlink
-            S_IFREG -> EntryKind.File
-            S_IFDIR -> EntryKind.Dir
-            else -> EntryKind.Other
-        }
-    }
+fun entryKind(path: Path): EntryKind? = stat(path, follow = false)?.kind
 
 /** Rust `Path::is_dir`: a directory, following links. */
-fun isDir(path: Path): Boolean = statMode(path)?.let { (it and S_IFMT) == S_IFDIR } ?: false
+fun isDir(path: Path): Boolean = stat(path, follow = true)?.kind == EntryKind.Dir
 
 /** The permission bits (`0o777` and above it the set-id and sticky bits), following links; null when missing. */
-fun mode(path: Path): Int? = statMode(path)?.let { it and MODE_BITS }
+fun mode(path: Path): Int? = stat(path, follow = true)?.mode
 
 /** The permission bits of [path] itself, a link not followed (Rust `symlink_metadata().permissions()`); null when missing. */
-fun linkMode(path: Path): Int? =
-    memScoped {
-        val st = alloc<stat>()
-        if (lstat(path.toString(), st.ptr) == 0) st.st_mode.toInt() and MODE_BITS else null
-    }
+fun linkMode(path: Path): Int? = stat(path, follow = false)?.mode
 
 /** The size of [path] itself, a link not followed (Rust `DirEntry::metadata().len()`); null when missing. */
-fun linkSize(path: Path): Long? =
-    memScoped {
-        val st = alloc<stat>()
-        if (lstat(path.toString(), st.ptr) == 0) st.st_size else null
-    }
-
-private fun statMode(path: Path): Int? =
-    memScoped {
-        val st = alloc<stat>()
-        if (stat(path.toString(), st.ptr) == 0) st.st_mode.toInt() else null
-    }
+fun linkSize(path: Path): Long? = stat(path, follow = false)?.size
 
 /** Rust `fs::read_link`: the link's target as written; null when [path] is not a link. */
-fun readLink(path: Path): Path? =
-    memScoped {
-        val buf = allocArray<ByteVar>(PATH_MAX + 1)
-        val n = readlink(path.toString(), buf, PATH_MAX.convert()).toInt()
-        if (n < 0) null else Path(buf.readBytes(n).decodeToString())
-    }
+fun readLink(path: Path): Path? = readLinkText(path)?.let(::Path)
 
 /** Rust `fs::create_dir_all`: every missing directory down to [dir]; an existing directory is fine. */
 fun createDirAll(dir: Path) {
     if (isDir(dir)) return
     dir.parent?.let { createDirAll(it) }
-    if (mkdir(dir.toString(), DIR_MODE.convert()) != 0 && !(errno == EEXIST && isDir(dir))) throw FsException.ofErrno(dir)
+    if (!makeDir(dir)) {
+        val code = lastOsError()
+        if (!(osKind(code) == FsException.Kind.AlreadyExists && isDir(dir))) throw FsException.ofErrno(dir, code)
+    }
 }
 
 /** Entry names of [dir] without `.` and `..`, in the order the system gives them, like `fs::read_dir`. */
-fun listDir(dir: Path): List<String> {
-    val d = opendir(dir.toString()) ?: throw FsException.ofErrno(dir)
-    try {
-        return buildList {
-            while (true) {
-                val name = readdir(d)?.pointed?.d_name?.toKString() ?: break
-                if (name != "." && name != "..") add(name)
-            }
-        }
-    } finally {
-        closedir(d)
-    }
-}
+fun listDir(dir: Path): List<String> = dirNames(dir) ?: throw FsException.ofErrno(dir)
 
 /** Every byte of [path]. */
-internal fun readAll(path: Path): ByteArray {
-    val fd = retry { open(path.toString(), O_RDONLY or O_CLOEXEC) }
-    if (fd < 0) throw FsException.ofErrno(path)
-    try {
-        return readFd(fd, path)
-    } finally {
-        close(fd)
-    }
-}
+internal fun readAll(path: Path): ByteArray = readWhole(path) ?: throw FsException.ofErrno(path)
 
-private fun readFd(
-    fd: Int,
-    path: Path,
-): ByteArray {
+/** Everything [read] yields into a buffer until it returns 0; negative is a failure, as from read(2). */
+internal inline fun readChunks(read: (ByteArray) -> Int): ByteArray? {
     val out = ArrayList<ByteArray>()
     val buf = ByteArray(CHUNK)
     while (true) {
-        val n = buf.usePinned { p -> retry { read(fd, p.addressOf(0), CHUNK.convert()).toInt() } }
-        if (n < 0) throw FsException.ofErrno(path)
+        val n = read(buf)
+        if (n < 0) return null
         if (n == 0) break
         out += buf.copyOf(n)
     }
@@ -137,22 +55,22 @@ private fun readFd(
     return all
 }
 
-/** Write the first [size] bytes of [bytes] to [fd]; a short write continues where it stopped. */
+/** Write the first [size] bytes of [bytes] to [file]; a short write continues where it stopped. */
 internal fun writeAll(
-    fd: Int,
+    file: WriteHandle,
     bytes: ByteArray,
     path: Path,
     size: Int = bytes.size,
 ) {
     var at = 0
     while (at < size) {
-        val n = bytes.usePinned { p -> retry { write(fd, p.addressOf(at), (size - at).convert()).toInt() } }
+        val n = file.write(bytes, at, size - at)
         if (n < 0) throw FsException.ofErrno(path)
         at += n
     }
 }
 
-/** Throw the current `errno` as an error about [path] unless [ok]. */
+/** Throw the last OS error as an error about [path] unless [ok]. */
 internal fun ensure(
     ok: Boolean,
     path: Path?,
@@ -160,13 +78,7 @@ internal fun ensure(
     if (!ok) throw FsException.ofErrno(path)
 }
 
-/** A system call again while a signal interrupts it. */
-internal inline fun retry(call: () -> Int): Int {
-    var r = call()
-    while (r < 0 && errno == EINTR) r = call()
-    return r
-}
-
-private const val MODE_BITS = 0b111_111_111_111
+/** Rust's default mode for a new file, before the umask. */
+internal const val NEW_FILE_MODE = 0b110_110_110
 internal const val DIR_MODE = 0b111_111_111
 private const val CHUNK = 64 * 1024

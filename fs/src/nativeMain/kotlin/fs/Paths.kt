@@ -1,24 +1,12 @@
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
-
 package fs
 
-import kotlinx.cinterop.toKString
 import kotlinx.io.files.Path
-import platform.posix.free
-import platform.posix.realpath
 
 /** Rust `fs::canonicalize`: the existing path with every link and `..` resolved; an error for a missing one. */
 fun canonicalize(path: Path): Path = realOrNull(path) ?: throw FsException.ofErrno(null)
 
-/** The canonical path when it exists, otherwise [path] as given. */
-fun canon(path: Path): Path = realOrNull(path) ?: path
+/** The canonical path when it exists, otherwise [path] with only the prefix Windows can drop without disk access. */
+fun canon(path: Path): Path = realOrNull(path) ?: Path(simplified(path.toString()))
 
-/** `realpath(3)`; null with `errno` set when it fails. */
-internal fun realOrNull(path: Path): Path? {
-    val real = realpath(path.toString(), null) ?: return null
-    try {
-        return Path(real.toKString())
-    } finally {
-        free(real)
-    }
-}
+/** `realpath(3)`, `GetFinalPathNameByHandleW` on Windows; null with the OS error left when it fails. */
+internal fun realOrNull(path: Path): Path? = realPath(path)?.let(::Path)

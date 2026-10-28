@@ -1,6 +1,7 @@
 package fs
 
 import kotlinx.io.files.Path
+import kotlinx.io.files.SystemPathSeparator
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -21,12 +22,13 @@ class WalkTest {
             it.path
                 .toString()
                 .removePrefix(root.toString())
+                .replace('\\', '/')
                 .removePrefix("/") to it.depth
         }.toList()
 
     @Test
     fun theRootComesFirstAndEachDirectoryBeforeItsContents(): Unit =
-        withTempDir { dir ->
+        withLinkDir { dir ->
             tree(dir)
             val got = rel(dir, walk(dir))
             assertEquals("" to 0, got.first())
@@ -37,16 +39,16 @@ class WalkTest {
 
     @Test
     fun aLinkBelowTheRootIsReportedAndNotFollowed(): Unit =
-        withTempDir { dir ->
+        withLinkDir { dir ->
             tree(dir)
             val entries = walk(dir).toList()
             assertEquals(EntryKind.Symlink, entries.single { it.path == Path(dir, "l") }.kind)
-            assertTrue(entries.none { it.path.toString().startsWith(Path(dir, "l").toString() + "/") })
+            assertTrue(entries.none { it.path.toString().startsWith(Path(dir, "l").toString() + SystemPathSeparator) })
         }
 
     @Test
     fun aRootThatIsALinkIsFollowed(): Unit =
-        withTempDir { dir ->
+        withLinkDir { dir ->
             tree(dir)
             val entries = walk(Path(dir, "l")).toList()
             assertEquals(EntryKind.Dir, entries.first().kind)
@@ -55,7 +57,7 @@ class WalkTest {
 
     @Test
     fun maxDepthStopsTheDescent(): Unit =
-        withTempDir { dir ->
+        withLinkDir { dir ->
             tree(dir)
             assertEquals(listOf("" to 0), rel(dir, walk(dir, maxDepth = 0)))
             assertEquals(setOf(0, 1), walk(dir, maxDepth = 1).map { it.depth }.toSet())
@@ -63,7 +65,7 @@ class WalkTest {
 
     @Test
     fun enterFalsePrunesADirectoryAndEverythingInIt(): Unit =
-        withTempDir { dir ->
+        withLinkDir { dir ->
             tree(dir)
             val got = rel(dir, walk(dir) { it.path.name != "a" }).map { it.first }.toSet()
             assertEquals(setOf("", "top", "l"), got)
@@ -71,7 +73,7 @@ class WalkTest {
 
     @Test
     fun aMissingRootGoesToOnError(): Unit =
-        withTempDir { dir ->
+        withLinkDir { dir ->
             val errors = mutableListOf<FsException>()
             assertEquals(emptyList(), walk(Path(dir, "missing"), onError = { errors += it }).toList())
             assertEquals(FsException.Kind.NotFound, errors.single().kind)

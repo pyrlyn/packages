@@ -1,0 +1,48 @@
+package = fs.win
+---
+// Each Win32 call fs makes, with its GetLastError taken in C right after it. Read from Kotlin, the code can already
+// be gone: returning from a native call may park the thread for the collector, and the runtime's own Win32 calls
+// there overwrite the last error.
+#include <windows.h>
+
+static __thread DWORD kit_err;
+
+/** The code the last wrapped call left, success or not; meaningful only after one that failed. */
+static inline DWORD kit_last_error(void) { return kit_err; }
+
+#define KIT_KEEP(call) do { __typeof__(call) r_ = (call); kit_err = GetLastError(); return r_; } while (0)
+
+static inline HANDLE kit_CreateFileW(LPCWSTR name, DWORD access, DWORD share, DWORD disposition, DWORD flags) {
+    KIT_KEEP(CreateFileW(name, access, share, NULL, disposition, flags, NULL));
+}
+static inline BOOL kit_GetFileInformationByHandle(HANDLE h, LPBY_HANDLE_FILE_INFORMATION info) {
+    KIT_KEEP(GetFileInformationByHandle(h, info));
+}
+static inline BOOL kit_GetFileInformationByHandleEx(HANDLE h, FILE_INFO_BY_HANDLE_CLASS what, LPVOID buf, DWORD size) {
+    KIT_KEEP(GetFileInformationByHandleEx(h, what, buf, size));
+}
+static inline BOOL kit_DeviceIoControl(HANDLE h, DWORD code, LPVOID out, DWORD size, LPDWORD got) {
+    KIT_KEEP(DeviceIoControl(h, code, NULL, 0, out, size, got, NULL));
+}
+static inline BOOL kit_CreateDirectoryW(LPCWSTR name) { KIT_KEEP(CreateDirectoryW(name, NULL)); }
+static inline HANDLE kit_FindFirstFileW(LPCWSTR pattern, LPWIN32_FIND_DATAW found) { KIT_KEEP(FindFirstFileW(pattern, found)); }
+static inline BOOL kit_FindNextFileW(HANDLE find, LPWIN32_FIND_DATAW found) { KIT_KEEP(FindNextFileW(find, found)); }
+static inline DWORD kit_GetFinalPathNameByHandleW(HANDLE h, LPWSTR buf, DWORD size) {
+    KIT_KEEP(GetFinalPathNameByHandleW(h, buf, size, 0));
+}
+static inline BOOL kit_ReadFile(HANDLE h, LPVOID buf, DWORD size, LPDWORD got) { KIT_KEEP(ReadFile(h, buf, size, got, NULL)); }
+static inline BOOL kit_WriteFile(HANDLE h, LPCVOID buf, DWORD size, LPDWORD put) { KIT_KEEP(WriteFile(h, buf, size, put, NULL)); }
+static inline BOOL kit_FlushFileBuffers(HANDLE h) { KIT_KEEP(FlushFileBuffers(h)); }
+static inline BOOL kit_MoveFileExW(LPCWSTR from, LPCWSTR to, DWORD flags) { KIT_KEEP(MoveFileExW(from, to, flags)); }
+static inline BOOL kit_DeleteFileW(LPCWSTR name) { KIT_KEEP(DeleteFileW(name)); }
+static inline BOOL kit_RemoveDirectoryW(LPCWSTR name) { KIT_KEEP(RemoveDirectoryW(name)); }
+static inline DWORD kit_GetFileAttributesW(LPCWSTR name) { KIT_KEEP(GetFileAttributesW(name)); }
+static inline BOOL kit_SetFileAttributesW(LPCWSTR name, DWORD attrs) { KIT_KEEP(SetFileAttributesW(name, attrs)); }
+static inline BOOL kit_CreateHardLinkW(LPCWSTR link, LPCWSTR original) { KIT_KEEP(CreateHardLinkW(link, original, NULL)); }
+static inline BOOLEAN kit_CreateSymbolicLinkW(LPCWSTR link, LPCWSTR target, DWORD flags) {
+    KIT_KEEP(CreateSymbolicLinkW(link, target, flags));
+}
+static inline BOOL kit_GetFileTime(HANDLE h, LPFILETIME modified) { KIT_KEEP(GetFileTime(h, NULL, NULL, modified)); }
+static inline BOOL kit_SetFileTime(HANDLE h, const FILETIME* accessed, const FILETIME* modified) {
+    KIT_KEEP(SetFileTime(h, NULL, accessed, modified));
+}

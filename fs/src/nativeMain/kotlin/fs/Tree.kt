@@ -1,19 +1,6 @@
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
-
 package fs
 
-import kotlinx.cinterop.convert
 import kotlinx.io.files.Path
-import platform.posix.O_CLOEXEC
-import platform.posix.O_CREAT
-import platform.posix.O_TRUNC
-import platform.posix.O_WRONLY
-import platform.posix.close
-import platform.posix.fchmod
-import platform.posix.open
-import platform.posix.rmdir
-import platform.posix.symlink
-import platform.posix.unlink
 
 /** Copy the directory [src] into [dest], creating [dest]. A regular file keeps its mode. */
 fun copyTree(
@@ -34,7 +21,7 @@ fun copyTree(
         when {
             link && links == Links.Skip -> Unit
 
-            link && links == Links.Keep -> keepLink(from, to)
+            link && links == Links.Keep && keepLink(from, to) -> Unit
 
             // A followed link to a directory is a directory to copy, not a file.
             kind == EntryKind.Dir || (link && isDir(from)) -> copyTree(from, to, links)
@@ -44,13 +31,19 @@ fun copyTree(
     }
 }
 
+/** Recreate the link [from] at [to]; false when Windows refuses (no Developer Mode), so the caller copies. */
 private fun keepLink(
     from: Path,
     to: Path,
-) {
-    val target = readLink(from) ?: throw FsException.ofErrno(from)
-    if (symlink(target.toString(), to.toString()) != 0) throw FsException.ofErrno(to)
+): Boolean {
+    val target = readLinkText(from) ?: throw FsException.ofErrno(from)
+    if (symlinkEntry(target, to, isDir(from))) return true
+    if (linksAreOptional) return false
+    throw FsException.ofErrno(to)
 }
+
+/** Whether a link that cannot be made is copied instead, as fs-kit does on Windows. */
+internal expect val linksAreOptional: Boolean
 
 /** Rust `fs::copy`: the bytes and the permission bits, following a link on the source side. */
 fun copyFile(
@@ -59,13 +52,12 @@ fun copyFile(
 ) {
     val bytes = readAll(from)
     val bits = mode(from) ?: throw FsException.ofErrno(from)
-    val fd = retry { open(to.toString(), O_WRONLY or O_CREAT or O_TRUNC or O_CLOEXEC, bits) }
-    ensure(fd >= 0, to)
+    val file = openWrite(to, Create.Truncate, bits) ?: throw FsException.ofErrno(to)
     try {
-        writeAll(fd, bytes, to)
-        ensure(fchmod(fd, bits.convert()) == 0, to)
+        writeAll(file, bytes, to)
+        ensure(file.setMode(bits), to)
     } finally {
-        close(fd)
+        file.close()
     }
 }
 
@@ -77,7 +69,7 @@ fun removeAny(path: Path) {
     when (entryKind(path)) {
         null -> Unit
         EntryKind.Dir -> removeDir(path)
-        else -> removeEntry(path) { unlink(it) }
+        else -> removeEntry(path) { unlinkEntry(it) }
     }
 }
 
@@ -90,14 +82,14 @@ private fun removeDir(dir: Path) {
             throw e
         }
     names.forEach { removeAny(Path(dir, it)) }
-    removeEntry(dir) { rmdir(it) }
+    removeEntry(dir) { removeDirEntry(it) }
 }
 
 private inline fun removeEntry(
     path: Path,
-    remove: (String) -> Int,
+    remove: (Path) -> Boolean,
 ) {
-    if (remove(path.toString()) == 0) return
+    if (remove(path)) return
     val e = FsException.ofErrno(path)
     if (e.kind != FsException.Kind.NotFound) throw e
 }

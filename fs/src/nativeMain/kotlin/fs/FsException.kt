@@ -1,19 +1,7 @@
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
-
 package fs
 
-import kotlinx.cinterop.toKString
 import kotlinx.io.IOException
 import kotlinx.io.files.Path
-import platform.posix.EACCES
-import platform.posix.EEXIST
-import platform.posix.EINVAL
-import platform.posix.EISDIR
-import platform.posix.ENOENT
-import platform.posix.ENOTDIR
-import platform.posix.EPERM
-import platform.posix.errno
-import platform.posix.strerror
 
 /**
  * A failed file operation (fs-kit's `io::Error` with a `PathError` inside). [path] is where it happened, so a
@@ -34,26 +22,18 @@ class FsException(
     fun withoutPath() = FsException(null, kind, errno, detail)
 
     companion object {
-        /** The error `errno` names, worded as Rust prints an OS error: `No such file or directory (os error 2)`. */
+        /**
+         * The OS error [code] (`errno`, on Windows `GetLastError`), worded as Rust prints one: `No such file or
+         * directory (os error 2)`.
+         */
         fun ofErrno(
             path: Path?,
-            code: Int = errno,
-        ) = FsException(path, kindOf(code), code, "${strerror(code)?.toKString()} (os error $code)")
+            code: Int = lastOsError(),
+        ) = FsException(path, osKind(code), code, "${osMessage(code)} (os error $code)")
 
         fun other(
             path: Path?,
             detail: String,
         ) = FsException(path, Kind.Other, null, detail)
-
-        private fun kindOf(code: Int) =
-            when (code) {
-                ENOENT -> Kind.NotFound
-                EEXIST -> Kind.AlreadyExists
-                EACCES, EPERM -> Kind.PermissionDenied
-                EISDIR -> Kind.IsADirectory
-                ENOTDIR -> Kind.NotADirectory
-                EINVAL -> Kind.InvalidInput
-                else -> Kind.Other
-            }
     }
 }

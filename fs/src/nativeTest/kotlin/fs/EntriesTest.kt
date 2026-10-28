@@ -13,15 +13,17 @@ class EntriesTest {
     /** A link's own bits are not its target's: a tree digest that followed it would miss a retargeted link. */
     @Test
     fun linkModeReadsTheLinkNotItsTarget(): Unit =
-        withTempDir { dir ->
-            val file = Path(dir, "f")
-            createNew(file, "x".encodeToByteArray())
-            setMode(file, "600".toInt(8))
-            symlink(file, Path(dir, "l"))
-            assertEquals("600".toInt(8), linkMode(file))
-            assertEquals("600".toInt(8), mode(Path(dir, "l")))
-            assertTrue(linkMode(Path(dir, "l")) != "600".toInt(8))
-            assertEquals(null, linkMode(Path(dir, "missing")))
+        unixModes {
+            withTempDir { dir ->
+                val file = Path(dir, "f")
+                createNew(file, "x".encodeToByteArray())
+                setMode(file, "600".toInt(8))
+                symlink(file, Path(dir, "l"))
+                assertEquals("600".toInt(8), linkMode(file))
+                assertEquals("600".toInt(8), mode(Path(dir, "l")))
+                assertTrue(linkMode(Path(dir, "l")) != "600".toInt(8))
+                assertEquals(null, linkMode(Path(dir, "missing")))
+            }
         }
 
     @Test
@@ -102,10 +104,11 @@ class EntriesTest {
 
     @Test
     fun aSymlinkKeepsItsTargetAsWritten(): Unit =
-        withTempDir { dir ->
+        withLinkDir { dir ->
             val link = Path(dir, "l")
             symlink(Path("../elsewhere"), link)
-            assertEquals(Path("../elsewhere"), readLink(link))
+            // Windows stores a relative target with its own separator.
+            assertEquals(Path(if (onWindows) "..\\elsewhere" else "../elsewhere"), readLink(link))
             assertEquals(EntryKind.Symlink, entryKind(link))
             assertEquals(FsException.Kind.AlreadyExists, assertFailsWith<FsException> { symlink(Path("x"), link) }.kind)
         }
@@ -122,11 +125,13 @@ class EntriesTest {
 
     @Test
     fun setModeSetsTheBitsAsGiven(): Unit =
-        withTempDir { dir ->
-            val file = Path(dir, "f")
-            createNew(file, ByteArray(0))
-            setMode(file, 0b111_101_000)
-            assertEquals(0b111_101_000, mode(file))
-            assertEquals(FsException.Kind.NotFound, assertFailsWith<FsException> { setMode(Path(dir, "nope"), 0) }.kind)
+        unixModes {
+            withTempDir { dir ->
+                val file = Path(dir, "f")
+                createNew(file, ByteArray(0))
+                setMode(file, 0b111_101_000)
+                assertEquals(0b111_101_000, mode(file))
+                assertEquals(FsException.Kind.NotFound, assertFailsWith<FsException> { setMode(Path(dir, "nope"), 0) }.kind)
+            }
         }
 }
