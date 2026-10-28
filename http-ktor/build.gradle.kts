@@ -7,6 +7,7 @@ configure<org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension> {
     }
     sourceSets.appleMain.dependencies { implementation("io.ktor:ktor-client-darwin:$ktor") }
     sourceSets.linuxMain.dependencies { implementation("io.ktor:ktor-client-curl:$ktor") }
+    sourceSets.mingwMain.dependencies { implementation("io.ktor:ktor-client-winhttp:$ktor") }
     sourceSets.commonTest.dependencies {
         implementation("io.ktor:ktor-client-mock:$ktor")
         implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
