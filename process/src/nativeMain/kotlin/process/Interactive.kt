@@ -16,3 +16,10 @@ fun Command.status(): ExitStatus {
         child.close()
     }
 }
+
+/**
+ * Start the command and leave it running past this process, apart from its console: no stdin, its output discarded, a
+ * process group of its own (Rust `spawn` with null stdio and `CREATE_NEW_PROCESS_GROUP`). For a helper that finishes a
+ * job once this process has exited. Returns its pid; throws [ProcessException] when it cannot be started.
+ */
+fun Command.spawnDetached(): Int = spawnDetached(this)

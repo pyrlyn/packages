@@ -52,6 +52,9 @@ internal expect fun spawnPiped(command: Command): Piped
 /** Start [command] sharing this process's stdin, stdout, stderr and console. */
 internal expect fun spawnInherited(command: Command): Child
 
+/** Start [command] with no stdin, its output discarded and in a group of its own, and leave it running; its pid. */
+internal expect fun spawnDetached(command: Command): Int
+
 /** For each of [sources], whether a read would not block, waiting up to [waitMs] for one to be. */
 internal expect fun ready(
     sources: List<Source>,

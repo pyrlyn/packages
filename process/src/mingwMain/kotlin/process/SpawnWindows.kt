@@ -39,6 +39,7 @@ import process.spawnwin.kit_child
 import process.spawnwin.kit_kill_tree
 import process.spawnwin.kit_peek
 import process.spawnwin.kit_read
+import process.spawnwin.kit_spawn_detached
 import process.spawnwin.kit_spawn_inherit
 import process.spawnwin.kit_spawn_piped
 import process.spawnwin.kit_wait
@@ -127,6 +128,15 @@ internal actual fun spawnInherited(command: Command): Child =
         val rc = kit_spawn_inherit(launch.application, launch.commandLine.wcstr.ptr, envBlock(command), command.dir, child.ptr)
         if (rc != 0u) throw cannotRun(command, osError(rc.toInt()))
         WinChild(child.process!!, null, child.pid.toInt(), command.program)
+    }
+
+internal actual fun spawnDetached(command: Command): Int =
+    memScoped {
+        val launch = launchOf(command)
+        val pid = alloc<DWORDVar>()
+        val rc = kit_spawn_detached(launch.application, launch.commandLine.wcstr.ptr, envBlock(command), command.dir, pid.ptr)
+        if (rc != 0u) throw cannotRun(command, osError(rc.toInt()))
+        pid.value.toInt()
     }
 
 private fun launchOf(command: Command): WindowsLaunch =

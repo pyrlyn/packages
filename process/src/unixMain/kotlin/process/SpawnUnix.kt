@@ -24,12 +24,14 @@ import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
 import kotlinx.cinterop.value
 import platform.posix.EINTR
+import platform.posix.O_WRONLY
 import platform.posix.POLLIN
 import platform.posix.SIGKILL
 import platform.posix.WNOHANG
 import platform.posix.close
 import platform.posix.errno
 import platform.posix.kill
+import platform.posix.open
 import platform.posix.poll
 import platform.posix.pollfd
 import platform.posix.read
@@ -133,6 +135,17 @@ internal actual fun spawnInherited(command: Command): Child =
         val rc = kit_spawn_inherit(pid.ptr, command.program, argv(command), envp(command), command.dir)
         if (rc != 0) throw cannotRun(command, osError(rc))
         PosixChild(pid.value, command.program)
+    }
+
+internal actual fun spawnDetached(command: Command): Int =
+    memScoped {
+        val nul = open("/dev/null", O_WRONLY)
+        if (nul < 0) throw cannotRun(command, osError(errno))
+        val pid = alloc<IntVar>()
+        val rc = kit_spawn(pid.ptr, command.program, argv(command), envp(command), command.dir, null, nul, nul)
+        close(nul)
+        if (rc != 0) throw cannotRun(command, osError(rc))
+        pid.value
     }
 
 private fun kotlinx.cinterop.MemScope.argv(command: Command) = allocArrayOf((listOf(command.program) + command.args + command.rawArgs).map { it.cstr.ptr } + listOf(null))
