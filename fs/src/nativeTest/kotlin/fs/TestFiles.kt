@@ -10,7 +10,7 @@ fun <T> withTempDir(body: (Path) -> T): T = TempDir.create("fs-test-").use { bod
 val onWindows = Platform.osFamily == OsFamily.WINDOWS
 
 /** Unix can always make a symlink; Windows only with Developer Mode on or for an administrator. */
-val symlinksWork: Boolean by lazy { !onWindows || withTempDir { runCatching { symlink(Path("x"), Path(it, "l")) }.isSuccess } }
+val symlinksWork: Boolean by lazy { !onWindows || withTempDir { runCatching { symlink(Path("x"), joinPath(it, "l")) }.isSuccess } }
 
 /** [body] in a fresh directory where this system makes symlinks; elsewhere the test says it skipped. */
 fun withLinkDir(body: (Path) -> Unit) = if (symlinksWork) withTempDir(body) else println("skipped: this Windows makes no symlinks")

@@ -45,7 +45,7 @@ private suspend fun SequenceScope<WalkEntry>.visit(
             return onError(e)
         }
     for (name in names) {
-        val path = Path(entry.path, name)
+        val path = joinPath(entry.path, name)
         val kind = entryKind(path)
         if (kind == null) {
             onError(FsException.ofErrno(path))

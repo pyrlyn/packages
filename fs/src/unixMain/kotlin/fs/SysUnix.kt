@@ -239,3 +239,5 @@ private const val MODE_BITS = 0b111_111_111_111
 internal actual val keepsModeOnReplace = true
 
 internal actual val linksAreOptional = false
+
+actual val PATH_SEPARATOR = '/'

@@ -33,7 +33,7 @@ private fun claim(
 ): Path {
     var n = 0u
     while (true) {
-        val bak = Path(dir, if (n == 0u) "$name.bak-$ts" else "$name.bak-$ts-$n")
+        val bak = joinPath(dir, if (n == 0u) "$name.bak-$ts" else "$name.bak-$ts-$n")
         try {
             createNew(bak, body, durable = true)
             return bak
@@ -56,7 +56,7 @@ private fun identicalBackupExists(
     val prefix = "$name.bak-"
     val names = runCatching { listDir(dir) }.getOrNull() ?: return false
     return names.filter { it.startsWith(prefix) }.any { entry ->
-        val sibling = Path(dir, entry)
+        val sibling = joinPath(dir, entry)
         // The size check comes first so a sibling that is no copy at all is never read.
         linkSize(sibling) == body.size.toLong() && runCatching { readAll(sibling) }.getOrNull()?.contentEquals(body) == true
     }

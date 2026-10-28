@@ -214,7 +214,7 @@ internal actual fun makeDir(path: Path): Boolean = kit_CreateDirectoryW(path.win
 internal actual fun dirNames(dir: Path): List<String>? =
     memScoped {
         val found = alloc<WIN32_FIND_DATAW>()
-        val find = kit_FindFirstFileW(Path(dir, "*").win, found.ptr)
+        val find = kit_FindFirstFileW(joinPath(dir, "*").win, found.ptr)
         if (find == INVALID_HANDLE_VALUE) return failed()
         try {
             buildList {
@@ -285,3 +285,5 @@ private const val SYMLINK_FLAGS = 16
 private const val SYMLINK_PATHS = 20
 private const val MOUNT_POINT_PATHS = 16
 private const val SYMLINK_FLAG_RELATIVE = 1
+
+actual val PATH_SEPARATOR = '\\'

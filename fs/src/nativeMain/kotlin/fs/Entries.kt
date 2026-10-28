@@ -39,7 +39,7 @@ fun symlink(
     target: Path,
     link: Path,
 ) {
-    val resolved = if (target.isAbsolute) target else Path(parentOf(link), target.toString())
+    val resolved = if (target.isAbsolute) target else joinPath(parentOf(link), target.toString())
     ensure(symlinkEntry(target.toString(), link, isDir(resolved)), link)
 }
 

@@ -15,21 +15,21 @@ class EntriesTest {
     fun linkModeReadsTheLinkNotItsTarget(): Unit =
         unixModes {
             withTempDir { dir ->
-                val file = Path(dir, "f")
+                val file = joinPath(dir, "f")
                 createNew(file, "x".encodeToByteArray())
                 setMode(file, "600".toInt(8))
-                symlink(file, Path(dir, "l"))
+                symlink(file, joinPath(dir, "l"))
                 assertEquals("600".toInt(8), linkMode(file))
-                assertEquals("600".toInt(8), mode(Path(dir, "l")))
-                assertTrue(linkMode(Path(dir, "l")) != "600".toInt(8))
-                assertEquals(null, linkMode(Path(dir, "missing")))
+                assertEquals("600".toInt(8), mode(joinPath(dir, "l")))
+                assertTrue(linkMode(joinPath(dir, "l")) != "600".toInt(8))
+                assertEquals(null, linkMode(joinPath(dir, "missing")))
             }
         }
 
     @Test
     fun createNewWritesOnceAndThenRefuses(): Unit =
         withTempDir { dir ->
-            val file = Path(dir, "f")
+            val file = joinPath(dir, "f")
             createNew(file, "1".encodeToByteArray())
             val err = assertFailsWith<FsException> { createNew(file, "2".encodeToByteArray()) }
             assertEquals(FsException.Kind.AlreadyExists, err.kind)
@@ -39,8 +39,8 @@ class EntriesTest {
     @Test
     fun aHardLinkSharesTheFileAndRefusesAnExistingName(): Unit =
         withTempDir { dir ->
-            val a = Path(dir, "a")
-            val b = Path(dir, "b")
+            val a = joinPath(dir, "a")
+            val b = joinPath(dir, "b")
             createNew(a, "x".encodeToByteArray())
             hardLink(a, b)
             assertEquals("x", readText(b))
@@ -50,7 +50,7 @@ class EntriesTest {
     @Test
     fun removeFileSaysWhenNothingWasThere(): Unit =
         withTempDir { dir ->
-            val file = Path(dir, "f")
+            val file = joinPath(dir, "f")
             createNew(file, ByteArray(0))
             removeFile(file)
             assertEquals(FsException.Kind.NotFound, assertFailsWith<FsException> { removeFile(file) }.kind)
@@ -59,8 +59,8 @@ class EntriesTest {
     @Test
     fun renameReplacesAFileAndKeepsTheErrorKind(): Unit =
         withTempDir { dir ->
-            val a = Path(dir, "a")
-            val b = Path(dir, "b")
+            val a = joinPath(dir, "a")
+            val b = joinPath(dir, "b")
             createNew(a, "new".encodeToByteArray())
             createNew(b, "old".encodeToByteArray())
             rename(a, b)
@@ -71,11 +71,11 @@ class EntriesTest {
     @Test
     fun removeEmptyDirLeavesADirectoryThatHoldsSomething(): Unit =
         withTempDir { dir ->
-            val full = Path(dir, "full")
+            val full = joinPath(dir, "full")
             createDir(full)
-            createNew(Path(full, "f"), ByteArray(0))
+            createNew(joinPath(full, "f"), ByteArray(0))
             assertFailsWith<FsException> { removeEmptyDir(full) }
-            removeFile(Path(full, "f"))
+            removeFile(joinPath(full, "f"))
             removeEmptyDir(full)
             assertEquals(FsException.Kind.NotFound, assertFailsWith<FsException> { removeEmptyDir(full) }.kind)
         }
@@ -83,29 +83,29 @@ class EntriesTest {
     @Test
     fun aModificationTimeCanBeReadAndMovedBack(): Unit =
         withTempDir { dir ->
-            val file = Path(dir, "f")
+            val file = joinPath(dir, "f")
             createNew(file, ByteArray(0))
             assertTrue(modifiedAgo(file) < 1.minutes)
             setModifiedAgo(file, 20.seconds)
             assertTrue(modifiedAgo(file) in 20.seconds..1.minutes, modifiedAgo(file).toString())
-            assertEquals(FsException.Kind.NotFound, assertFailsWith<FsException> { modifiedAgo(Path(dir, "nope")) }.kind)
+            assertEquals(FsException.Kind.NotFound, assertFailsWith<FsException> { modifiedAgo(joinPath(dir, "nope")) }.kind)
         }
 
     @Test
     fun timesCanBeSetToAMomentLongAgo(): Unit =
         withTempDir { dir ->
-            val file = Path(dir, "f")
+            val file = joinPath(dir, "f")
             file.write("x")
             setTimes(file, 1)
             val age = modifiedAgo(file)
             assertTrue(age > (50 * 365).days, "$age")
-            assertEquals(FsException.Kind.NotFound, assertFailsWith<FsException> { setTimes(Path(dir, "nope"), 1) }.kind)
+            assertEquals(FsException.Kind.NotFound, assertFailsWith<FsException> { setTimes(joinPath(dir, "nope"), 1) }.kind)
         }
 
     @Test
     fun aSymlinkKeepsItsTargetAsWritten(): Unit =
         withLinkDir { dir ->
-            val link = Path(dir, "l")
+            val link = joinPath(dir, "l")
             symlink(Path("../elsewhere"), link)
             // Windows stores a relative target with its own separator.
             assertEquals(Path(if (onWindows) "..\\elsewhere" else "../elsewhere"), readLink(link))
@@ -116,22 +116,22 @@ class EntriesTest {
     @Test
     fun createDirMakesOneLevelAndRefusesWhatIsThere(): Unit =
         withTempDir { dir ->
-            val sub = Path(dir, "a")
+            val sub = joinPath(dir, "a")
             createDir(sub)
             assertTrue(isDir(sub))
             assertEquals(FsException.Kind.AlreadyExists, assertFailsWith<FsException> { createDir(sub) }.kind)
-            assertEquals(FsException.Kind.NotFound, assertFailsWith<FsException> { createDir(Path(dir, "b/c")) }.kind)
+            assertEquals(FsException.Kind.NotFound, assertFailsWith<FsException> { createDir(joinPath(dir, "b/c")) }.kind)
         }
 
     @Test
     fun setModeSetsTheBitsAsGiven(): Unit =
         unixModes {
             withTempDir { dir ->
-                val file = Path(dir, "f")
+                val file = joinPath(dir, "f")
                 createNew(file, ByteArray(0))
                 setMode(file, 0b111_101_000)
                 assertEquals(0b111_101_000, mode(file))
-                assertEquals(FsException.Kind.NotFound, assertFailsWith<FsException> { setMode(Path(dir, "nope"), 0) }.kind)
+                assertEquals(FsException.Kind.NotFound, assertFailsWith<FsException> { setMode(joinPath(dir, "nope"), 0) }.kind)
             }
         }
 }

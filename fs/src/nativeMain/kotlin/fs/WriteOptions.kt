@@ -89,7 +89,7 @@ data class WriteOptions(
     private fun createTemp(target: Path): Pair<Path, WriteHandle> {
         val dir = parentOf(target)
         repeat(TEMP_ATTEMPTS) {
-            val tmp = Path(dir, ".${target.name}.tmp-${processId()}-${Random.nextInt().toUInt()}-${counter.fetchAndIncrement()}")
+            val tmp = joinPath(dir, ".${target.name}.tmp-${processId()}-${Random.nextInt().toUInt()}-${counter.fetchAndIncrement()}")
             openWrite(tmp, Create.New, mode ?: NEW_FILE_MODE)?.let { return tmp to it }
             val code = lastOsError()
             if (osKind(code) != FsException.Kind.AlreadyExists) throw FsException.ofErrno(null, code)
@@ -136,7 +136,7 @@ private fun linkTarget(path: Path): Path {
     repeat(MAX_LINKS) {
         realOrNull(p)?.let { return it }
         val next = readLink(p) ?: return p
-        p = if (next.isAbsolute) next else Path(parentOf(p), next.toString())
+        p = if (next.isAbsolute) next else joinPath(parentOf(p), next.toString())
     }
     throw FsException.other(null, "too many levels of symbolic links")
 }

@@ -12,7 +12,7 @@ class TempFileTest {
     @Test
     fun aPersistedFileHoldsEveryPieceWrittenAndStays() {
         TempDir.create().use { dir ->
-            val dest = Path(dir.path, "out")
+            val dest = joinPath(dir.path, "out")
             TempFile.createIn(dir.path).use { tmp ->
                 unixModes { assertEquals("600".toInt(8), mode(tmp.path)) }
                 tmp.write("hello ".encodeToByteArray())
@@ -38,7 +38,7 @@ class TempFileTest {
     @Test
     fun aMissingDirectoryFailsAsAnFsError() {
         TempDir.create().use { dir ->
-            assertFailsWith<FsException> { TempFile.createIn(Path(dir.path, "nope")) }
+            assertFailsWith<FsException> { TempFile.createIn(joinPath(dir.path, "nope")) }
         }
     }
 }

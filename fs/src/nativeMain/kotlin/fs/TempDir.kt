@@ -41,7 +41,7 @@ internal inline fun <T : Any> freshName(
 ): T {
     repeat(NAME_ATTEMPTS) {
         val name = prefix + (1..NAME_LENGTH).map { NAME_CHARS[Random.nextInt(NAME_CHARS.length)] }.joinToString("")
-        make(Path(dir, name))?.let { return it }
+        make(joinPath(dir, name))?.let { return it }
         val code = lastOsError()
         if (osKind(code) != FsException.Kind.AlreadyExists) throw FsException.ofErrno(dir, code)
     }

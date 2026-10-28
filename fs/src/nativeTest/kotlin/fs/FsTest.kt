@@ -13,7 +13,7 @@ class FsTest {
     @Test
     fun aWrappedErrorKeepsItsKindOsCodeAndPath() =
         withTempDir { dir ->
-            val missing = Path(dir, "nope")
+            val missing = joinPath(dir, "nope")
             val err = assertFailsWith<FsException> { readText(missing) }
             assertEquals(FsException.Kind.NotFound, err.kind)
             assertEquals("$missing: $NOT_FOUND", err.message)
@@ -27,11 +27,11 @@ class FsTest {
     @Test
     fun aMissingFileReadsAsEmptyAndADirectoryIsAnError() =
         withTempDir { dir ->
-            assertEquals("", textOrEmpty(Path(dir, "nope")))
-            assertNull(bytesIfExists(Path(dir, "nope")))
-            Path(dir, "a").write("x")
-            assertEquals("x", textOrEmpty(Path(dir, "a")))
-            assertContentEquals("x".encodeToByteArray(), bytesIfExists(Path(dir, "a")))
+            assertEquals("", textOrEmpty(joinPath(dir, "nope")))
+            assertNull(bytesIfExists(joinPath(dir, "nope")))
+            joinPath(dir, "a").write("x")
+            assertEquals("x", textOrEmpty(joinPath(dir, "a")))
+            assertContentEquals("x".encodeToByteArray(), bytesIfExists(joinPath(dir, "a")))
             val err = assertFailsWith<FsException> { textOrEmpty(dir) }
             assertTrue(dir.toString() in err.message!!, err.message)
         }
@@ -39,7 +39,7 @@ class FsTest {
     @Test
     fun createsAndReplacesWithoutLeftovers() =
         withTempDir { dir ->
-            val f = Path(dir, "state.json")
+            val f = joinPath(dir, "state.json")
             f.write("one")
             assertEquals("one", f.text())
             f.write("two")
@@ -50,7 +50,7 @@ class FsTest {
     @Test
     fun missingParentFailsUnlessAskedToCreateIt() =
         withTempDir { dir ->
-            val f = Path(dir, "x/y/z.toml")
+            val f = joinPath(dir, "x/y/z.toml")
             assertEquals(FsException.Kind.NotFound, assertFailsWith<FsException> { f.write("v") }.kind)
             WriteOptions(createParent = true).write(f, "v".encodeToByteArray())
             assertEquals("v", f.text())
@@ -65,7 +65,7 @@ class FsTest {
     @Test
     fun notDurableStillReplaces() =
         withTempDir { dir ->
-            val f = Path(dir, "c")
+            val f = joinPath(dir, "c")
             WriteOptions(durable = false).write(f, "fast".encodeToByteArray())
             assertEquals("fast", f.text())
         }
@@ -73,7 +73,7 @@ class FsTest {
     @Test
     fun ifChangedCreatesTheParentAndSkipsIdenticalBytes() =
         withTempDir { dir ->
-            val f = Path(dir, "sub/a.txt")
+            val f = joinPath(dir, "sub/a.txt")
             assertTrue(ifChanged(f, "x".encodeToByteArray()))
             assertFalse(ifChanged(f, "x".encodeToByteArray()))
             assertTrue(ifChanged(f, "y".encodeToByteArray()))
@@ -83,7 +83,7 @@ class FsTest {
     @Test
     fun anErrorNamesTheFile() =
         withTempDir { dir ->
-            val err = assertFailsWith<FsException> { Path(dir, "gone/z.toml").write("v") }
+            val err = assertFailsWith<FsException> { joinPath(dir, "gone/z.toml").write("v") }
             assertEquals(FsException.Kind.NotFound, err.kind)
             assertTrue("z.toml" in err.message!!, err.message)
         }
@@ -92,7 +92,7 @@ class FsTest {
     fun keepsTheOldMode() =
         unixModes {
             withTempDir { dir ->
-                val f = Path(dir, "secret")
+                val f = joinPath(dir, "secret")
                 f.write("old")
                 setMode(f, "600".toInt(8))
                 f.write("new")
@@ -104,7 +104,7 @@ class FsTest {
     fun modeAppliesToANewFileAndYieldsToAnExistingOne() =
         unixModes {
             withTempDir { dir ->
-                val f = Path(dir, "key")
+                val f = joinPath(dir, "key")
                 val private = WriteOptions(mode = "600".toInt(8))
                 private.write(f, "k".encodeToByteArray())
                 assertEquals("600".toInt(8), mode(f))
@@ -119,8 +119,8 @@ class FsTest {
     @Test
     fun writesThroughASymlinkAndKeepsIt() =
         withLinkDir { dir ->
-            val real = Path(dir, "real.json")
-            val linked = Path(dir, "link.json")
+            val real = joinPath(dir, "real.json")
+            val linked = joinPath(dir, "link.json")
             real.write("old")
             link("real.json", linked)
             linked.write("new")
@@ -131,18 +131,18 @@ class FsTest {
     @Test
     fun createsTheTargetOfADanglingSymlink() =
         withLinkDir { dir ->
-            val linked = Path(dir, "link")
+            val linked = joinPath(dir, "link")
             link("missing", linked)
             linked.write("made")
             assertEquals(EntryKind.Symlink, entryKind(linked))
-            assertEquals("made", Path(dir, "missing").text())
+            assertEquals("made", joinPath(dir, "missing").text())
         }
 
     @Test
     fun notFollowingReplacesTheLinkItself() =
         withLinkDir { dir ->
-            val real = Path(dir, "real")
-            val linked = Path(dir, "link")
+            val real = joinPath(dir, "real")
+            val linked = joinPath(dir, "link")
             real.write("old")
             link(real.toString(), linked)
             WriteOptions(followSymlinks = false).write(linked, "new".encodeToByteArray())
@@ -153,8 +153,8 @@ class FsTest {
     @Test
     fun symlinkCycleEnds() =
         withLinkDir { dir ->
-            val a = Path(dir, "a")
-            val b = Path(dir, "b")
+            val a = joinPath(dir, "a")
+            val b = joinPath(dir, "b")
             link(b.toString(), a)
             link(a.toString(), b)
             assertFailsWith<FsException> { a.write("v") }
@@ -164,63 +164,63 @@ class FsTest {
     @Test
     fun linksAreKeptOrFollowedAsAsked() =
         withLinkDir { dir ->
-            val src = Path(dir, "src")
-            createDirAll(Path(src, "real"))
-            Path(src, "real/f").write("f")
-            link("real", Path(src, "link"))
-            copyTree(src, Path(dir, "kept"), Links.Keep)
-            assertEquals(EntryKind.Symlink, entryKind(Path(dir, "kept/link")))
-            copyTree(src, Path(dir, "followed"), Links.Follow)
-            assertEquals(EntryKind.Dir, entryKind(Path(dir, "followed/link")))
-            assertEquals("f", Path(dir, "followed/link/f").text())
-            copyTree(src, Path(dir, "skipped"), Links.Skip)
-            assertNull(entryKind(Path(dir, "skipped/link")))
-            assertEquals("f", Path(dir, "skipped/real/f").text())
+            val src = joinPath(dir, "src")
+            createDirAll(joinPath(src, "real"))
+            joinPath(src, "real/f").write("f")
+            link("real", joinPath(src, "link"))
+            copyTree(src, joinPath(dir, "kept"), Links.Keep)
+            assertEquals(EntryKind.Symlink, entryKind(joinPath(dir, "kept/link")))
+            copyTree(src, joinPath(dir, "followed"), Links.Follow)
+            assertEquals(EntryKind.Dir, entryKind(joinPath(dir, "followed/link")))
+            assertEquals("f", joinPath(dir, "followed/link/f").text())
+            copyTree(src, joinPath(dir, "skipped"), Links.Skip)
+            assertNull(entryKind(joinPath(dir, "skipped/link")))
+            assertEquals("f", joinPath(dir, "skipped/real/f").text())
         }
 
     @Test
     fun copyTreeKeepsAFilesMode() =
         unixModes {
             withTempDir { dir ->
-                val src = Path(dir, "src")
-                createDirAll(Path(src, "bin"))
-                Path(src, "bin/tool").write("#!/bin/sh\n")
-                setMode(Path(src, "bin/tool"), "755".toInt(8))
-                copyTree(src, Path(dir, "dest"), Links.Follow)
-                assertEquals("755".toInt(8), mode(Path(dir, "dest/bin/tool")))
-                assertEquals("#!/bin/sh\n", Path(dir, "dest/bin/tool").text())
+                val src = joinPath(dir, "src")
+                createDirAll(joinPath(src, "bin"))
+                joinPath(src, "bin/tool").write("#!/bin/sh\n")
+                setMode(joinPath(src, "bin/tool"), "755".toInt(8))
+                copyTree(src, joinPath(dir, "dest"), Links.Follow)
+                assertEquals("755".toInt(8), mode(joinPath(dir, "dest/bin/tool")))
+                assertEquals("#!/bin/sh\n", joinPath(dir, "dest/bin/tool").text())
             }
         }
 
     @Test
     fun removeAnyTakesAFileATreeAndNothing() =
         withTempDir { dir ->
-            Path(dir, "f").write("f")
-            createDirAll(Path(dir, "d/e"))
-            removeAny(Path(dir, "f"))
-            removeAny(Path(dir, "d"))
-            removeAny(Path(dir, "never"))
-            assertNull(entryKind(Path(dir, "f")))
-            assertNull(entryKind(Path(dir, "d")))
+            joinPath(dir, "f").write("f")
+            createDirAll(joinPath(dir, "d/e"))
+            removeAny(joinPath(dir, "f"))
+            removeAny(joinPath(dir, "d"))
+            removeAny(joinPath(dir, "never"))
+            assertNull(entryKind(joinPath(dir, "f")))
+            assertNull(entryKind(joinPath(dir, "d")))
         }
 
     @Test
     fun removeAnyNeverFollowsALinkIntoItsTarget() =
         withLinkDir { dir ->
-            createDirAll(Path(dir, "keep"))
-            Path(dir, "keep/f").write("f")
-            link(Path(dir, "keep").toString(), Path(dir, "link"))
-            removeAny(Path(dir, "link"))
-            assertEquals("f", Path(dir, "keep/f").text())
+            createDirAll(joinPath(dir, "keep"))
+            joinPath(dir, "keep/f").write("f")
+            link(joinPath(dir, "keep").toString(), joinPath(dir, "link"))
+            removeAny(joinPath(dir, "link"))
+            assertEquals("f", joinPath(dir, "keep/f").text())
         }
 
     @Test
     fun canonResolvesLinksAndLeavesAMissingPathAlone() =
         withLinkDir { dir ->
-            createDirAll(Path(dir, "real"))
-            link("real", Path(dir, "link"))
-            assertEquals(canonicalize(Path(dir, "real")), canonicalize(Path(dir, "link")))
-            val missing = Path(dir, "missing")
+            createDirAll(joinPath(dir, "real"))
+            link("real", joinPath(dir, "link"))
+            assertEquals(canonicalize(joinPath(dir, "real")), canonicalize(joinPath(dir, "link")))
+            val missing = joinPath(dir, "missing")
             assertEquals(missing, canon(missing))
             assertEquals(FsException.Kind.NotFound, assertFailsWith<FsException> { canonicalize(missing) }.kind)
         }
@@ -229,7 +229,7 @@ class FsTest {
     @Test
     fun replacesAReadOnlyFile() =
         withTempDir { dir ->
-            val f = Path(dir, "f")
+            val f = joinPath(dir, "f")
             f.write("old")
             setMode(f, "444".toInt(8))
             f.write("new")
@@ -240,7 +240,7 @@ class FsTest {
     fun windowsReportsReadOnlyAsAModeWithoutWriteBits() {
         if (!onWindows) return
         withTempDir { dir ->
-            val f = Path(dir, "f")
+            val f = joinPath(dir, "f")
             f.write("x")
             assertEquals("666".toInt(8), mode(f))
             setMode(f, "444".toInt(8))

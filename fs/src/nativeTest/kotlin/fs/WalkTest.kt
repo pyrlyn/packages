@@ -8,10 +8,10 @@ import kotlin.test.assertTrue
 
 class WalkTest {
     private fun tree(dir: Path) {
-        createDirAll(Path(dir, "a/b"))
-        Path(dir, "a/b/f").write("f")
-        Path(dir, "top").write("t")
-        link("a", Path(dir, "l"))
+        createDirAll(joinPath(dir, "a/b"))
+        joinPath(dir, "a/b/f").write("f")
+        joinPath(dir, "top").write("t")
+        link("a", joinPath(dir, "l"))
     }
 
     private fun rel(
@@ -42,17 +42,17 @@ class WalkTest {
         withLinkDir { dir ->
             tree(dir)
             val entries = walk(dir).toList()
-            assertEquals(EntryKind.Symlink, entries.single { it.path == Path(dir, "l") }.kind)
-            assertTrue(entries.none { it.path.toString().startsWith(Path(dir, "l").toString() + SystemPathSeparator) })
+            assertEquals(EntryKind.Symlink, entries.single { it.path == joinPath(dir, "l") }.kind)
+            assertTrue(entries.none { it.path.toString().startsWith(joinPath(dir, "l").toString() + SystemPathSeparator) })
         }
 
     @Test
     fun aRootThatIsALinkIsFollowed(): Unit =
         withLinkDir { dir ->
             tree(dir)
-            val entries = walk(Path(dir, "l")).toList()
+            val entries = walk(joinPath(dir, "l")).toList()
             assertEquals(EntryKind.Dir, entries.first().kind)
-            assertEquals(setOf("", "b", "b/f"), rel(Path(dir, "l"), entries.asSequence()).map { it.first }.toSet())
+            assertEquals(setOf("", "b", "b/f"), rel(joinPath(dir, "l"), entries.asSequence()).map { it.first }.toSet())
         }
 
     @Test
@@ -75,7 +75,7 @@ class WalkTest {
     fun aMissingRootGoesToOnError(): Unit =
         withLinkDir { dir ->
             val errors = mutableListOf<FsException>()
-            assertEquals(emptyList(), walk(Path(dir, "missing"), onError = { errors += it }).toList())
+            assertEquals(emptyList(), walk(joinPath(dir, "missing"), onError = { errors += it }).toList())
             assertEquals(FsException.Kind.NotFound, errors.single().kind)
         }
 }

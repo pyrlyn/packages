@@ -18,7 +18,7 @@ class RenameWindowsTest {
     @Test
     fun renameReplacesAFileThatIsOpenElsewhere(): Unit =
         withTempDir { dir ->
-            val target = Path(dir, "target")
+            val target = joinPath(dir, "target")
             createNew(target, "old".encodeToByteArray())
             val reader = checkNotNull(opened(kit_CreateFileW(target.win, GENERIC_READ, SHARE_ALL, OPEN_EXISTING.convert(), FILE_ATTRIBUTE_NORMAL.convert())))
             try {

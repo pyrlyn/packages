@@ -15,7 +15,7 @@ class TempDirTest {
             val inner = TempDir.createIn(outer.path, "stage-")
             assertEquals(outer.path, inner.path.parent)
             assertTrue(inner.path.name.startsWith("stage-"), inner.path.name)
-            Path(inner.path, "file").let { atomic(it, "x".encodeToByteArray()) }
+            joinPath(inner.path, "file").let { atomic(it, "x".encodeToByteArray()) }
             inner.close()
             assertNull(entryKind(inner.path))
             assertEquals(emptyList(), SystemFileSystem.list(outer.path))
@@ -25,7 +25,7 @@ class TempDirTest {
     @Test
     fun aMissingParentFailsAsAFileError() {
         TempDir.create().use { outer ->
-            val err = assertFailsWith<FsException> { TempDir.createIn(Path(outer.path, "nope")) }
+            val err = assertFailsWith<FsException> { TempDir.createIn(joinPath(outer.path, "nope")) }
             assertEquals(FsException.Kind.NotFound, err.kind)
         }
     }

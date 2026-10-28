@@ -14,8 +14,8 @@ fun copyTree(
         throw e.at(dest)
     }
     for (name in listDir(src)) {
-        val from = Path(src, name)
-        val to = Path(dest, name)
+        val from = joinPath(src, name)
+        val to = joinPath(dest, name)
         val kind = entryKind(from) ?: throw FsException.ofErrno(from)
         val link = kind == EntryKind.Symlink
         when {
@@ -81,7 +81,7 @@ private fun removeDir(dir: Path) {
             if (e.kind == FsException.Kind.NotFound) return
             throw e
         }
-    names.forEach { removeAny(Path(dir, it)) }
+    names.forEach { removeAny(joinPath(dir, it)) }
     removeEntry(dir) { removeDirEntry(it) }
 }
 
