@@ -28,7 +28,7 @@ internal interface WriteHandle {
 }
 
 /** How [openWrite] creates its file. */
-internal enum class Create { New, Truncate }
+internal enum class Create { New, Truncate, Append }
 
 /** The code the last failed call left: `errno` on Unix, `GetLastError` on Windows (Rust `raw_os_error`). */
 internal expect fun lastOsError(): Int

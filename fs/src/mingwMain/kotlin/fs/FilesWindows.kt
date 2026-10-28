@@ -38,8 +38,10 @@ import platform.windows.FILE_ATTRIBUTE_DIRECTORY
 import platform.windows.FILE_ATTRIBUTE_NORMAL
 import platform.windows.FILE_ATTRIBUTE_READONLY
 import platform.windows.FILE_ATTRIBUTE_REPARSE_POINT
+import platform.windows.FILE_GENERIC_WRITE
 import platform.windows.FILE_READ_ATTRIBUTES
 import platform.windows.FILE_WRITE_ATTRIBUTES
+import platform.windows.FILE_WRITE_DATA
 import platform.windows.GENERIC_READ
 import platform.windows.GENERIC_WRITE
 import platform.windows.GetCurrentProcessId
@@ -48,6 +50,7 @@ import platform.windows.GetTempPathW
 import platform.windows.HANDLE
 import platform.windows.INVALID_FILE_ATTRIBUTES
 import platform.windows.MOVEFILE_REPLACE_EXISTING
+import platform.windows.OPEN_ALWAYS
 import platform.windows.OPEN_EXISTING
 import platform.windows.WCHARVar
 
@@ -70,8 +73,15 @@ internal actual fun openWrite(
     create: Create,
     mode: Int,
 ): WriteHandle? {
-    val how = if (create == Create.New) CREATE_NEW else CREATE_ALWAYS
-    val h = opened(kit_CreateFileW(path.win, GENERIC_WRITE.convert(), SHARE_ALL, how.convert(), FILE_ATTRIBUTE_NORMAL.convert()))
+    val how =
+        when (create) {
+            Create.New -> CREATE_NEW
+            Create.Truncate -> CREATE_ALWAYS
+            Create.Append -> OPEN_ALWAYS
+        }
+    // Rust's `append`: without FILE_WRITE_DATA every write lands at the end, however many writers there are.
+    val access = if (create == Create.Append) FILE_GENERIC_WRITE and FILE_WRITE_DATA.inv() else GENERIC_WRITE.convert()
+    val h = opened(kit_CreateFileW(path.win, access.convert(), SHARE_ALL, how.convert(), FILE_ATTRIBUTE_NORMAL.convert()))
     return h?.let { FileHandle(it, path) }
 }
 

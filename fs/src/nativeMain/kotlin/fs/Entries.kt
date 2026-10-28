@@ -2,7 +2,12 @@
 // and modification times, which a lock file and an archive extractor are built from.
 package fs
 
+import kotlinx.io.Buffer
+import kotlinx.io.RawSink
+import kotlinx.io.Sink
+import kotlinx.io.buffered
 import kotlinx.io.files.Path
+import kotlinx.io.readByteArray
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.nanoseconds
 
@@ -23,6 +28,39 @@ fun createNew(
         file.close()
     }
 }
+
+/**
+ * Open [path] for appending, creating it when missing (Rust `OpenOptions::new().append(true).create(true)`). Unlike
+ * kotlinx-io's sink, the file is shared for deletion on Windows, as Rust's is, so it can be removed while still open.
+ */
+fun appendSink(path: Path): Sink {
+    val file = openWrite(path, Create.Append, NEW_FILE_MODE) ?: throw FsException.ofErrno(path)
+    return HandleSink(file, path).buffered()
+}
+
+private class HandleSink(
+    private val file: WriteHandle,
+    private val path: Path,
+) : RawSink {
+    override fun write(
+        source: Buffer,
+        byteCount: Long,
+    ) {
+        var left = byteCount
+        while (left > 0) {
+            val bytes = source.readByteArray(minOf(left, SINK_CHUNK.toLong()).toInt())
+            writeAll(file, bytes, path)
+            left -= bytes.size
+        }
+    }
+
+    // Each write already reached the system; there is no buffer of our own to push.
+    override fun flush() = Unit
+
+    override fun close() = file.close()
+}
+
+private const val SINK_CHUNK = 64 * 1024
 
 /** Give [original] a second name, [link] (Rust `hard_link`); an existing [link] is [FsException.Kind.AlreadyExists]. */
 fun hardLink(

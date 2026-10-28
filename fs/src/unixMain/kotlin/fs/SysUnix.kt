@@ -24,6 +24,7 @@ import platform.posix.EISDIR
 import platform.posix.ENOENT
 import platform.posix.ENOTDIR
 import platform.posix.EPERM
+import platform.posix.O_APPEND
 import platform.posix.O_CLOEXEC
 import platform.posix.O_CREAT
 import platform.posix.O_EXCL
@@ -142,7 +143,12 @@ internal actual fun openWrite(
     create: Create,
     mode: Int,
 ): WriteHandle? {
-    val how = if (create == Create.New) O_EXCL else O_TRUNC
+    val how =
+        when (create) {
+            Create.New -> O_EXCL
+            Create.Truncate -> O_TRUNC
+            Create.Append -> O_APPEND
+        }
     val fd = retry { open(path.toString(), O_WRONLY or O_CREAT or how or O_CLOEXEC, mode) }
     return if (fd < 0) null else FdHandle(fd)
 }

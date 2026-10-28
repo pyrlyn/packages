@@ -36,6 +36,21 @@ class EntriesTest {
             assertEquals("1", readText(file))
         }
 
+    /** A log is appended to across runs and must not keep `self uninstall` from removing it while it is open. */
+    @Test
+    fun anAppendSinkAddsToTheEndAndItsFileCanBeRemovedWhileOpen(): Unit =
+        withTempDir { dir ->
+            val file = joinPath(dir, "log")
+            appendSink(file).use { it.write("one\n".encodeToByteArray()) }
+            appendSink(file).use { sink ->
+                sink.write("two\n".encodeToByteArray())
+                sink.flush()
+                assertEquals("one\ntwo\n", readText(file))
+                removeFile(file)
+            }
+            assertEquals(null, entryKind(file))
+        }
+
     @Test
     fun aHardLinkSharesTheFileAndRefusesAnExistingName(): Unit =
         withTempDir { dir ->
