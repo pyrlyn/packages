@@ -1,0 +1,167 @@
+syntax = "proto3";
+
+// Record sync shared by every product: a server-ordered change log per scope and
+// product, pulled by cursor and pushed with base versions. Semantics: docs/sync.md.
+package pyrlyn.sync.v1;
+
+import "pyrlyn/common/v1/common.proto";
+
+// Syncs one product's records between a user's devices, or between an organization's
+// members. Every call needs a bearer token; errors are listed in docs/sync.md.
+service SyncService {
+  // Opts this device in to syncing one scope. Idempotent; also returns the limits.
+  rpc EnableSync(EnableSyncRequest) returns (EnableSyncResponse);
+  // Opts this device out of one scope. Records already on the server stay there.
+  rpc DisableSync(DisableSyncRequest) returns (DisableSyncResponse);
+  // Returns records changed after a cursor, oldest change first.
+  rpc Pull(PullRequest) returns (PullResponse);
+  // Applies a batch of record changes and reports the outcome of each one.
+  rpc Push(PushRequest) returns (PushResponse);
+}
+
+// Whose records a call reads or writes. The owner is named explicitly, never taken from
+// the token alone, so a device that switched account or organization cannot write one
+// owner's local data into another's.
+message Scope {
+  // Exactly one owner.
+  oneof owner {
+    // Personal records; must equal the token's `sub`.
+    string user_id = 1;
+    // Records shared by an organization; must equal the token's `org`.
+    string organization_id = 2;
+  }
+}
+
+// Current server state of one record.
+message Record {
+  // Product-defined record type, for example "note".
+  string kind = 1;
+  // Client-chosen id, unique within the scope, product and kind.
+  string id = 2;
+  // Server sequence number of the write that produced this state. Push it back as
+  // `Mutation.base_version` to change the record.
+  uint64 version = 3;
+  // Product-encoded content, opaque to the server; empty when deleted.
+  bytes payload = 4;
+  // True for a tombstone: the record was deleted at this version.
+  bool deleted = 5;
+  // Client wall-clock time of the write, clamped by the server; decides last-writer-wins.
+  int64 modified_at_unix_ms = 6;
+}
+
+// Asks to opt this device in to one scope.
+message EnableSyncRequest {
+  // Product and device making the call.
+  pyrlyn.common.v1.ClientInfo client = 1;
+  // Scope to opt in to.
+  Scope scope = 2;
+  // Human-readable device name shown in the dashboard, for example "work laptop".
+  string device_name = 3;
+}
+
+// Confirms the opt-in.
+message EnableSyncResponse {
+  // Limits the client sizes its batches and records by.
+  SyncLimits limits = 1;
+}
+
+// Server limits for one product and scope.
+message SyncLimits {
+  // Largest accepted `Mutation.payload`, in bytes.
+  uint32 max_payload_bytes = 1;
+  // Most mutations accepted in one `PushRequest`.
+  uint32 max_push_mutations = 2;
+  // Most records returned by one `PullResponse`.
+  uint32 max_pull_records = 3;
+}
+
+// Asks to opt this device out of one scope.
+message DisableSyncRequest {
+  // Product and device making the call.
+  pyrlyn.common.v1.ClientInfo client = 1;
+  // Scope to opt out of.
+  Scope scope = 2;
+}
+
+// Confirms the opt-out.
+message DisableSyncResponse {}
+
+// Asks for records changed after a cursor.
+message PullRequest {
+  // Product and device making the call.
+  pyrlyn.common.v1.ClientInfo client = 1;
+  // Scope to read.
+  Scope scope = 2;
+  // Opaque cursor from the last `PullResponse.cursor`; empty reads from the start.
+  string cursor = 3;
+  // Maximum records to return; 0 means the server default.
+  uint32 limit = 4;
+}
+
+// One page of changes. Each record appears once, in its latest state.
+message PullResponse {
+  // Changed records in ascending `version` order, tombstones included.
+  repeated Record records = 1;
+  // Cursor to store and send next time; never empty, even when `records` is.
+  string cursor = 2;
+  // True when more changes are waiting; pull again at once with `cursor`.
+  bool has_more = 3;
+}
+
+// One change to one record.
+message Mutation {
+  // Client-generated unique id (UUIDv7), so a retried push applies once.
+  string mutation_id = 1;
+  // Product-defined record type.
+  string kind = 2;
+  // Client-chosen record id.
+  string id = 3;
+  // The `Record.version` this change was made on; 0 when the client believes the record
+  // does not exist yet.
+  uint64 base_version = 4;
+  // New product-encoded content; must be empty when `deleted` is set.
+  bytes payload = 5;
+  // Deletes the record, leaving a tombstone.
+  bool deleted = 6;
+  // Client wall-clock time of the change.
+  int64 modified_at_unix_ms = 7;
+}
+
+// Asks to apply a batch of changes.
+message PushRequest {
+  // Product and device making the call.
+  pyrlyn.common.v1.ClientInfo client = 1;
+  // Scope to write.
+  Scope scope = 2;
+  // Changes, applied in order; at most one per record.
+  repeated Mutation mutations = 3;
+}
+
+// Outcome of every mutation, in request order.
+message PushResponse {
+  // One result per `PushRequest.mutations` entry.
+  repeated MutationResult results = 1;
+}
+
+// What happened to one mutation.
+message MutationResult {
+  // The mutation this result is for.
+  string mutation_id = 1;
+  // Whether it was stored.
+  MutationOutcome outcome = 2;
+  // The record as the server now holds it: the new state when applied, the state that
+  // won otherwise.
+  Record record = 3;
+}
+
+// Result of one mutation.
+enum MutationOutcome {
+  // Never sent.
+  MUTATION_OUTCOME_UNSPECIFIED = 0;
+  // Stored; `record.version` is the new version.
+  MUTATION_OUTCOME_APPLIED = 1;
+  // Lost to a newer write under last-writer-wins; adopt `record`.
+  MUTATION_OUTCOME_SUPERSEDED = 2;
+  // The kind rejects writes on a stale base; merge with `record` and push again.
+  MUTATION_OUTCOME_CONFLICT = 3;
+}

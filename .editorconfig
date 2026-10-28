@@ -1,0 +1,6 @@
+# ktlint (ci.diffuser.ktlint from ci-diffuser): `./gradlew ktlintCheck` / `./gradlew ktlintFormat`.
+root = true
+
+[*.{kt,kts}]
+# Long lines read better than wrapped calls in this code, as in backend-kotlin.
+ktlint_standard_max-line-length = disabled

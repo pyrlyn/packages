@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+// cox's sync record payloads. Mapping and identity rules: docs/sync.md, "cox mapping".
+package pyrlyn.cox.v1;
+
+// One cox memory fact: the payload of sync records of kind "memory". The record id is the
+// lowercase hex SHA-256 of `project_key NUL name`, so the same fact written on two devices
+// is one record.
+message Memory {
+  // `host/owner/repo` of the project's origin URL, or cox's project slug when the project
+  // has no origin.
+  string project_key = 1;
+  // Fact name, `[a-z0-9-]`, unique within the project; the file stem on disk.
+  string name = 2;
+  // One-line description shown in cox's memory index.
+  string description = 3;
+  // The frontmatter `type`, for example "user", "feedback" or "project".
+  string memory_type = 4;
+  // Fact text after the frontmatter. cox derives its file links from it, so they are not
+  // synced: they hold absolute paths of one machine.
+  string body = 5;
+}

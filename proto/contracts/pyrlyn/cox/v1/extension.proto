@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+// cox's sync record payloads. Mapping and identity rules: docs/sync.md, "cox mapping".
+package pyrlyn.cox.v1;
+
+// One user-authored cox extension file: the payload of sync records of kind "extension".
+// The record id is the lowercase hex SHA-256 of `group NUL path`, so the same file edited
+// on two devices is one record.
+message Extension {
+  // The folder under `~/.cox` the file lives in: "agents", "commands", "skills" or "themes".
+  string group = 1;
+  // Path relative to that folder with `/` separators, for example "review.md" or
+  // "release/SKILL.md".
+  string path = 2;
+  // File contents as stored; bytes, because a skill folder may hold more than text.
+  bytes content = 3;
+}
