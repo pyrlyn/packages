@@ -124,7 +124,7 @@ fun ifChanged(
 fun syncDir(dir: Path) = syncDirEntry(dir)
 
 /** `Path::parent`, where a bare file name's parent is the current directory. */
-internal fun parentOf(path: Path): Path = path.parent?.takeIf { it.toString().isNotEmpty() } ?: Path(".")
+internal fun parentOf(path: Path): Path = path.exactParent?.takeIf { it.toString().isNotEmpty() } ?: Path(".")
 
 /**
  * The file [path] resolves to. `realpath` fails on a dangling link (a dotfile manager's link whose target is not

@@ -23,7 +23,7 @@ fun readLink(path: Path): Path? = readLinkText(path)?.let(::Path)
 /** Rust `fs::create_dir_all`: every missing directory down to [dir]; an existing directory is fine. */
 fun createDirAll(dir: Path) {
     if (isDir(dir)) return
-    dir.parent?.let { createDirAll(it) }
+    dir.exactParent?.let { createDirAll(it) }
     if (!makeDir(dir)) {
         val code = lastOsError()
         if (!(osKind(code) == FsException.Kind.AlreadyExists && isDir(dir))) throw FsException.ofErrno(dir, code)
