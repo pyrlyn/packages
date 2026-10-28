@@ -1,22 +1,11 @@
 package cli
 
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.alloc
-import kotlinx.cinterop.convert
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.ptr
 import kotlinx.cinterop.toKString
-import platform.posix.STDERR_FILENO
-import platform.posix.STDIN_FILENO
-import platform.posix.STDOUT_FILENO
-import platform.posix.TIOCGWINSZ
 import platform.posix.fflush
 import platform.posix.fputs
 import platform.posix.getenv
-import platform.posix.ioctl
-import platform.posix.isatty
 import platform.posix.stdout
-import platform.posix.winsize
 
 /**
  * Settings for this process, as a clap program with `wrap_help` and `color` reads its terminal: the width of the
@@ -28,34 +17,38 @@ fun terminalSettings(binName: String): Settings = Settings(binName, terminalWidt
 /** Print an [Parsed.Exit]'s text to its stream, without colour unless anstream would colour that stream. */
 @OptIn(ExperimentalForeignApi::class)
 fun Parsed.Exit.write() {
-    val fd = if (stderr) STDERR_FILENO else STDOUT_FILENO
     val stream = if (stderr) platform.posix.stderr else stdout
-    fputs(if (colors(fd)) text else plain(text), stream)
+    fputs(if (colors(if (stderr) Stream.Err else Stream.Out)) text else plain(text), stream)
     fflush(stream)
 }
 
-@OptIn(ExperimentalForeignApi::class)
-private fun terminalWidth(): Int? =
-    listOf(STDOUT_FILENO, STDERR_FILENO, STDIN_FILENO).firstNotNullOfOrNull { fd ->
-        memScoped {
-            val size = alloc<winsize>()
-            if (isatty(fd) == 1 && ioctl(fd, TIOCGWINSZ.convert(), size.ptr) == 0) size.ws_col.toInt() else null
-        }
-    }
+/** The standard streams, in the order clap asks them for the terminal's width. */
+internal enum class Stream { Out, Err, In }
+
+/** The width of the first standard stream that is a terminal. */
+internal expect fun terminalWidth(): Int?
+
+internal expect fun isTerminal(stream: Stream): Boolean
+
+/** anstyle-query's `term_supports_color`, which differs on Windows. */
+internal expect fun termSupportsColor(term: String?): Boolean
+
+/** False where the stream is a terminal that cannot show escape sequences, as an old Windows console cannot. */
+internal expect fun showsEscapes(stream: Stream): Boolean
 
 /** clap's `parse_env("COLUMNS")`: a `usize`, or nothing. */
 private fun columns(): Int? = env("COLUMNS")?.removePrefix("+")?.takeIf { it.isNotEmpty() && it.all(Char::isDigit) }?.toIntOrNull()
 
 @OptIn(ExperimentalForeignApi::class)
-private fun env(name: String): String? = getenv(name)?.toKString()
+internal fun env(name: String): String? = getenv(name)?.toKString()
 
 /** anstream's `AutoStream::choice` under clap's `ColorChoice::Auto`. */
-private fun colors(fd: Int): Boolean {
+private fun colors(stream: Stream): Boolean {
     val clicolor = env("CLICOLOR")?.let { it != "0" }
     return when {
         env("NO_COLOR").orEmpty().isNotEmpty() -> false
-        (env("CLICOLOR_FORCE") ?: "0") != "0" -> true
+        (env("CLICOLOR_FORCE") ?: "0") != "0" -> showsEscapes(stream)
         clicolor == false -> false
-        else -> isatty(fd) == 1 && (env("TERM")?.let { it != "dumb" } == true || clicolor == true || env("CI") != null)
+        else -> isTerminal(stream) && (termSupportsColor(env("TERM")) || clicolor == true || env("CI") != null) && showsEscapes(stream)
     }
 }
