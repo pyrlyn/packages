@@ -1,0 +1,9 @@
+# The SQLite :db-native links statically on Windows. The version here, the recipe revision in conan.lock.
+[requires]
+sqlite3/3.54.0
+
+[options]
+*:shared=False
+sqlite3/*:build_executable=False
+# FTS5 as the bundled SQLite of :db-room has it on macOS and Linux.
+sqlite3/*:enable_fts5=True

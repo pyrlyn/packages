@@ -1,0 +1,9 @@
+{
+    "version": "0.5",
+    "requires": [
+        "sqlite3/3.54.0#046b32a04208e0b8b81f45c1c18c9806%1791877631.855"
+    ],
+    "build_requires": [],
+    "python_requires": [],
+    "config_requires": []
+}

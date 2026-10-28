@@ -1,101 +1,30 @@
 package db.room
 
-import db.Db
-import db.DbException
-import kotlin.test.*
+import db.testing.DriverContract
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class RoomDbTest {
-    private fun open() = RoomDbDriver.open(":memory:")
+    private val contract = DriverContract(RoomDbDriver)
 
-    @Test fun roundTripsTypesAndFts5() {
-        open().use { db ->
-            db.exec("CREATE TABLE t (a INTEGER, b TEXT, c BLOB, d REAL); CREATE VIRTUAL TABLE f USING fts5(x)")
-            assertEquals(1, db.execute("INSERT INTO t VALUES (?, ?, ?, ?)", 5L, "héllo", byteArrayOf(0, 1, 2), 1.5))
-            db.execute("INSERT INTO t VALUES (?, ?, ?, ?)", null, "", ByteArray(0), null)
-            val rows = db.query("SELECT a, b, c, d FROM t ORDER BY rowid") { listOf(it.longOrNull(0), it.string(1), it.blob(2).toList(), it.doubleOrNull(3)) }
-            assertEquals(listOf(listOf(5L, "héllo", listOf<Byte>(0, 1, 2), 1.5), listOf(null, "", emptyList<Byte>(), null)), rows)
-            db.execute("INSERT INTO f(x) VALUES (?)", "token reduction")
-            assertEquals(1L, db.longOf("SELECT count(*) FROM f WHERE f MATCH ?", "reduction"))
-            assertEquals(2L, db.lastInsertRowid().let { db.longOf("SELECT count(*) FROM t") })
-        }
-    }
+    @Test fun roundTripsTypesAndFts5() = contract.roundTripsTypesAndFts5()
 
-    @Test fun aCursorIsSteppedByItsCaller() {
-        open().use { db ->
-            db.exec("CREATE TABLE t (a INTEGER); INSERT INTO t VALUES (1), (2), (3)")
-            val seen =
-                db.cursor("SELECT a FROM t WHERE a > ? ORDER BY a", 1) { c ->
-                    assertTrue(c.next())
-                    val first = c.long(0)
-                    assertTrue(c.next())
-                    first to c.long(0)
-                }
-            assertEquals(2L to 3L, seen)
-            assertFalse(db.cursor("SELECT a FROM t WHERE a > 9") { it.next() })
-        }
-    }
+    @Test fun columnsHaveTheirNamesAndTheLastRowIdComesBack() = contract.columnsHaveTheirNamesAndTheLastRowIdComesBack()
 
-    @Test fun transactionRollsBackAndNests() {
-        open().use { db ->
-            db.exec("CREATE TABLE t (a INTEGER)")
-            assertFails {
-                db.transaction {
-                    db.execute("INSERT INTO t VALUES (1)")
-                    error("boom")
-                }
-            }
-            db.transaction {
-                db.execute("INSERT INTO t VALUES (2)")
-                runCatching {
-                    db.transaction {
-                        db.execute("INSERT INTO t VALUES (3)")
-                        error("inner")
-                    }
-                }
-            }
-            assertEquals(listOf(2L), db.query("SELECT a FROM t") { it.long(0) })
-            assertFalse(db.inTransaction)
-        }
-    }
+    @Test fun aCursorIsSteppedByItsCaller() = contract.aCursorIsSteppedByItsCaller()
 
-    @Test fun errorsCarryTheSqliteCode() {
-        open().use { db ->
-            val e = assertFailsWith<DbException> { db.exec("SELECT * FROM missing") }
-            assertEquals(1, e.code)
-            assertTrue("no such table" in e.message!!, e.message)
-        }
-    }
+    @Test fun transactionRollsBackAndNests() = contract.transactionRollsBackAndNests()
 
-    @Test fun scriptsSplitOnStatementsButNotInsideTriggersQuotesOrComments() {
-        val sql =
-            """
-            -- a; comment
-            CREATE TABLE a (x TEXT DEFAULT 'semi;colon'); /* block; */
-            CREATE TRIGGER tr AFTER INSERT ON a BEGIN
-              INSERT INTO b(x) VALUES (new.x); UPDATE b SET y = 1;
-            END;
-            CREATE TABLE "b;c" (y INTEGER)
-            """.trimIndent()
-        val parts = splitSql(sql)
+    @Test fun errorsCarryTheSqliteCode() = contract.errorsCarryTheSqliteCode()
+
+    @Test fun installsOnce() = contract.installsOnce()
+
+    @Test
+    fun scriptsSplitOnStatementsButNotInsideTriggersQuotesOrComments() {
+        val parts = splitSql(DriverContract.SCRIPT)
         assertEquals(3, parts.size, parts.joinToString("\n---\n"))
         assertTrue("CREATE TRIGGER" in parts[1] && parts[1].endsWith("END;"), parts[1])
-        open().use { db ->
-            db.exec("CREATE TABLE b (x TEXT, y INTEGER); " + sql)
-            db.execute("INSERT INTO a VALUES ('v')")
-            assertEquals(1L, db.longOf("SELECT y FROM b"))
-        }
-    }
-
-    @Test fun driverInstallsOnce() {
-        Db.installIfAbsent(RoomDbDriver)
-        Db.installIfAbsent(
-            object : db.DbDriver {
-                override fun open(path: String) = error("x")
-
-                override fun version() = "x"
-            },
-        )
-        assertSame(RoomDbDriver, Db.driver)
-        assertTrue(RoomDbDriver.version().startsWith("3."))
+        contract.scriptsRunWhole(DriverContract.SCRIPT)
     }
 }

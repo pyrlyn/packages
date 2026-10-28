@@ -4,7 +4,6 @@ import app.cash.sqldelight.TransacterImpl
 import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.db.use
-import db.room.RoomDbDriver
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
@@ -23,7 +22,7 @@ class KitSqlDriverTest {
 
     @Test
     fun parametersBindFromZeroAndEveryTypeRoundTrips() {
-        KitSqlDriver(RoomDbDriver.open(":memory:")).use { driver ->
+        KitSqlDriver(testDriver.open(":memory:")).use { driver ->
             driver.execute(null, "CREATE TABLE t (a INTEGER, b TEXT, c BLOB, d REAL, e INTEGER)", 0)
             val changed =
                 driver
@@ -51,7 +50,7 @@ class KitSqlDriverTest {
 
     @Test
     fun aFailedInnerTransactionRollsBackTheOuterOne() {
-        KitSqlDriver(RoomDbDriver.open(":memory:")).use { driver ->
+        KitSqlDriver(testDriver.open(":memory:")).use { driver ->
             val db = Transacter(driver)
             driver.execute(null, "CREATE TABLE t (a INTEGER, b TEXT, c BLOB, d REAL, e INTEGER)", 0)
             db.transaction { driver.execute(null, "INSERT INTO t (a) VALUES (1)", 0) }
