@@ -14,10 +14,22 @@ subprojects {
     pluginManager.apply("ci.diffuser.detekt")
     configure<org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension> {
         // The native targets the consumers build. The code came from native-only rtok-kotlin and its
-        // tests use native APIs; a JVM or Windows target waits for a consumer that needs one.
+        // tests use native APIs; a JVM target waits for a consumer that needs one. ketch builds for Windows.
         macosArm64()
         linuxX64()
         linuxArm64()
+        mingwX64()
+        // unixMain holds the POSIX code macOS and Linux share; mingwMain the Windows side of the same API.
+        applyDefaultHierarchyTemplate {
+            common {
+                group("native") {
+                    group("unix") {
+                        group("apple")
+                        group("linux")
+                    }
+                }
+            }
+        }
         compilerOptions { allWarningsAsErrors.set(true) }
         sourceSets.commonTest.dependencies { implementation(kotlin("test")) }
     }
