@@ -7,6 +7,10 @@ class Command(
 ) {
     private val extraEnv = LinkedHashMap<String, String>()
     private val unset = LinkedHashSet<String>()
+    private val raw = mutableListOf<String>()
+
+    /** Text added with [rawArg], in order, after [args]. */
+    val rawArgs: List<String> get() = raw
 
     /** The child's working directory; null keeps this process's. */
     var dir: String? = null
@@ -47,6 +51,12 @@ class Command(
 
     /** Read the child's stdin from [path] when it runs under `runBounded`. */
     fun stdinFrom(path: String) = apply { stdin = path }
+
+    /**
+     * Rust `CommandExt::raw_arg`: on Windows, [text] goes into the command line exactly as written, with no quoting,
+     * for a program that parses its own (`cmd /C`). Unix has no command line, so there it is one more argument.
+     */
+    fun rawArg(text: String) = apply { raw += text }
 
     /** Start the child in [dir]. */
     fun currentDir(dir: String) = apply { this.dir = dir }

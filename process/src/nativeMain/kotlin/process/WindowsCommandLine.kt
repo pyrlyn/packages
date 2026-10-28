@@ -29,9 +29,9 @@ internal fun windowsLaunch(
 ): WindowsLaunch {
     val program = resolveExe(command.program, dirs, exists)
     return if (isBatch(fullPath(program))) {
-        WindowsLaunch("${dirs.systemDir}\\cmd.exe", batCommandLine(program, command.args))
+        WindowsLaunch("${dirs.systemDir}\\cmd.exe", batCommandLine(program, command.args, command.rawArgs))
     } else {
-        WindowsLaunch(program, commandLine(command.program, command.args))
+        WindowsLaunch(program, commandLine(command.program, command.args, command.rawArgs))
     }
 }
 
@@ -77,6 +77,7 @@ internal fun splitPaths(paths: String): List<String> =
 internal fun commandLine(
     program: String,
     args: List<String>,
+    raw: List<String> = emptyList(),
 ): String =
     buildString {
         requireNoNul(program)
@@ -85,7 +86,16 @@ internal fun commandLine(
             append(' ')
             appendArg(arg)
         }
+        appendRaw(raw)
     }
+
+/** Rust `Arg::Raw`: each one after a space, exactly as given; only a NUL is refused. */
+private fun StringBuilder.appendRaw(raw: List<String>) {
+    for (arg in raw) {
+        requireNoNul(arg)
+        append(' ').append(arg)
+    }
+}
 
 /** Rust `append_arg`: quoted when empty or holding a space or tab; backslashes doubled only before a quote. */
 private fun StringBuilder.appendArg(arg: String) {
@@ -116,6 +126,7 @@ private fun StringBuilder.appendArg(arg: String) {
 internal fun batCommandLine(
     script: String,
     args: List<String>,
+    raw: List<String> = emptyList(),
 ): String =
     buildString {
         append("cmd.exe /e:ON /v:OFF /d /c \"")
@@ -127,6 +138,8 @@ internal fun batCommandLine(
             if (arg.any { it == '\r' || it == '\n' }) throw InvalidProgram("batch file arguments are invalid")
             appendBatArg(arg)
         }
+        // Raw arguments are passed on as they are: what cmd makes of them is the caller's to decide.
+        appendRaw(raw)
         append('"')
     }
 

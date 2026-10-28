@@ -135,7 +135,7 @@ internal actual fun spawnInherited(command: Command): Child =
         PosixChild(pid.value, command.program)
     }
 
-private fun kotlinx.cinterop.MemScope.argv(command: Command) = allocArrayOf((listOf(command.program) + command.args).map { it.cstr.ptr } + listOf(null))
+private fun kotlinx.cinterop.MemScope.argv(command: Command) = allocArrayOf((listOf(command.program) + command.args + command.rawArgs).map { it.cstr.ptr } + listOf(null))
 
 private fun kotlinx.cinterop.MemScope.envp(command: Command) = if (command.inheritsEnv) kit_environ() else allocArrayOf(command.mergedEnv().map { it.cstr.ptr } + listOf(null))
 

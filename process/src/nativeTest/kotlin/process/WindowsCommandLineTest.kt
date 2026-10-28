@@ -22,6 +22,17 @@ class WindowsCommandLineTest {
         assertEquals("\"prog\" \"\"", commandLine("prog", listOf("")))
     }
 
+    /** Rust std's `test_raw_args`, with the raw arguments after the regular ones, the only order kit builds. */
+    @Test
+    fun rawArgumentsGoInExactlyAsWritten() {
+        assertEquals(
+            "\"quoted exe\" \"quote me\" optional-quotes quote me *not* \t\\ internal \\\"backslash-\"quote",
+            commandLine("quoted exe", listOf("quote me", "optional-quotes"), listOf("quote me *not*", "\t\\", "internal \\\"backslash-\"quote")),
+        )
+        assertEquals("cmd.exe /e:ON /v:OFF /d /c \"\"x.cmd\" a echo %PATH% & dir\"", batCommandLine("x.cmd", listOf("a"), listOf("echo %PATH% & dir")))
+        assertFailsWith<InvalidProgram> { commandLine("prog", emptyList(), listOf("a\u0000b")) }
+    }
+
     @Test
     fun aBatchFileRunsThroughCmdWithEveryArgumentDefused() {
         assertEquals("cmd.exe /e:ON /v:OFF /d /c \"\"C:\\x.bat\" plain\"", batCommandLine("C:\\x.bat", listOf("plain")))
