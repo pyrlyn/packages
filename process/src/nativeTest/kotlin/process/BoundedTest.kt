@@ -1,5 +1,8 @@
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+
 package process
 
+import kotlinx.cinterop.toKString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -32,6 +35,35 @@ class BoundedTest {
                 .currentDir("/")
                 .run()
         assertEquals("one|/|home", out.stdout.decodeToString())
+    }
+
+    @Test
+    fun aRemovedVariableIsNotInheritedAndASetOneWinsOverTheRemoval() {
+        val out =
+            sh("printf '%s|%s' \"\${HOME-unset}\" \"\$PATH\"")
+                .envRemove("HOME")
+                .envRemove("PATH")
+                .env("PATH", "/kit")
+                .run()
+        assertEquals("unset|/kit", out.stdout.decodeToString())
+    }
+
+    @Test
+    fun stdinComesFromTheNamedFile() {
+        val input = "${platform.posix.getenv("TMPDIR")?.toKString() ?: "/tmp"}/kit-process-stdin-${platform.posix.getpid()}"
+        sh("printf 'typed ahead\\n' > \"\$0\"").let { Command(it.program, it.args + input) }.run()
+        try {
+            assertEquals(
+                "typed ahead\n",
+                sh("cat")
+                    .stdinFrom(input)
+                    .run()
+                    .stdout
+                    .decodeToString(),
+            )
+        } finally {
+            platform.posix.unlink(input)
+        }
     }
 
     @Test

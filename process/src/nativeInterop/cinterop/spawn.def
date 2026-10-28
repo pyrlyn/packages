@@ -55,12 +55,12 @@ static inline int kit_pipe(int fds[2]) {
 }
 
 /*
- * Spawn `program` (looked up on PATH) with stdin on /dev/null, stdout and stderr on the given pipe ends, in `dir`
- * when it is not null, as the leader of its own process group, with SIGPIPE at its default and no signal blocked,
+ * Spawn `program` (looked up on PATH) with stdin on `in_path` (/dev/null when it is null), stdout and stderr on the
+ * given pipe ends, in `dir` when it is not null, as the leader of its own process group, with SIGPIPE at its default and no signal blocked,
  * as Rust's Command starts a child. Returns 0 or the errno.
  */
 static inline int kit_spawn(int *pid, const char *program, char *const argv[], char *const envp[], const char *dir,
-                            int out_fd, int err_fd) {
+                            const char *in_path, int out_fd, int err_fd) {
     posix_spawn_file_actions_t actions;
     posix_spawnattr_t attr;
     sigset_t defaults, mask;
@@ -71,8 +71,8 @@ static inline int kit_spawn(int *pid, const char *program, char *const argv[], c
         posix_spawn_file_actions_destroy(&actions);
         return rc;
     }
-    /* No stdin: a child waiting on input would sit out the deadline. */
-    rc = posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0);
+    /* A file or nothing, never this process's stdin: a child waiting on input would sit out the deadline. */
+    rc = posix_spawn_file_actions_addopen(&actions, 0, in_path ? in_path : "/dev/null", O_RDONLY, 0);
     if (!rc) rc = posix_spawn_file_actions_adddup2(&actions, out_fd, 1);
     if (!rc) rc = posix_spawn_file_actions_adddup2(&actions, err_fd, 2);
     if (!rc && dir) rc = kit_addchdir(&actions, dir);

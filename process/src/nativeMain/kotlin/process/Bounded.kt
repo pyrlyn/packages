@@ -1,4 +1,4 @@
-// A child run under three guards: no stdin, output capped, and a deadline after which its whole process tree is
+// A child run under three guards: no stdin but a file the caller names, output capped, and a deadline after which its whole process tree is
 // killed. A command a file or a plugin supplies is untrusted; without these, one that waits on input, prints forever
 // or never exits takes the caller down with it.
 @file:OptIn(ExperimentalForeignApi::class)
@@ -158,9 +158,9 @@ private class Run(
             }
             err.fd = errPipe[0]
             val argv = allocArrayOf((listOf(command.program) + command.args).map { it.cstr.ptr } + listOf(null))
-            val envp = if (command.env.isEmpty()) kit_environ() else allocArrayOf(mergedEnv(command.env).map { it.cstr.ptr } + listOf(null))
+            val envp = if (command.inheritsEnv) kit_environ() else allocArrayOf(command.mergedEnv().map { it.cstr.ptr } + listOf(null))
             val pid = alloc<IntVar>()
-            val rc = kit_spawn(pid.ptr, command.program, argv, envp, command.dir, outPipe[1], errPipe[1])
+            val rc = kit_spawn(pid.ptr, command.program, argv, envp, command.dir, command.stdin, outPipe[1], errPipe[1])
             // The child has its copies; the parent keeping the write ends would never see end of file.
             close(outPipe[1])
             close(errPipe[1])
@@ -266,15 +266,20 @@ private fun killTree(pid: Int) {
 }
 
 /** This process's environment as `KEY=value` entries, [extra] set on top (Rust `Command::env`). */
-internal fun mergedEnv(extra: Map<String, String>): List<String> =
+
+/** Whether the child gets this process's environment unchanged. */
+internal val Command.inheritsEnv get() = env.isEmpty() && removedEnv.isEmpty()
+
+internal fun Command.mergedEnv(): List<String> =
     buildList {
-        val env: CPointer<CPointerVar<ByteVar>>? = kit_environ()
+        val inherited: CPointer<CPointerVar<ByteVar>>? = kit_environ()
         var i = 0
-        while (env != null) {
-            val entry = env[i++]?.toKString() ?: break
-            if (entry.substringBefore('=') !in extra) add(entry)
+        while (inherited != null) {
+            val entry = inherited[i++]?.toKString() ?: break
+            val key = entry.substringBefore('=')
+            if (key !in env && key !in removedEnv) add(entry)
         }
-        extra.forEach { (k, v) -> add("$k=$v") }
+        env.forEach { (k, v) -> add("$k=$v") }
     }
 
 /** An errno worded as Rust prints an OS error: `No such file or directory (os error 2)`. */

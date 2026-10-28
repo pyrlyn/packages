@@ -35,7 +35,7 @@ private const val EXE_PATH_MAX = 4096
 fun Command.status(): ExitStatus =
     memScoped {
         val argv = allocArrayOf((listOf(program) + args).map { it.cstr.ptr } + listOf(null))
-        val envp = if (env.isEmpty()) kit_environ() else allocArrayOf(mergedEnv(env).map { it.cstr.ptr } + listOf(null))
+        val envp = if (inheritsEnv) kit_environ() else allocArrayOf(mergedEnv().map { it.cstr.ptr } + listOf(null))
         val pid = alloc<IntVar>()
         val rc = kit_spawn_inherit(pid.ptr, program, argv, envp, dir)
         if (rc != 0) throw ProcessException("could not run $program: ${osError(rc)}", ByteArray(0))
