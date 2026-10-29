@@ -1,0 +1,4 @@
+# A separate repository (pyrlyn/crates) that lives next to the Kotlin packages.
+/crates/
+.rtok/
+.DS_Store
