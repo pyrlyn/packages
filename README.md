@@ -50,8 +50,8 @@ ci-diffuser at `../../apps/ci-diffuser`, or `CI_DIFFUSER_DIR`.
 `conan.lock` with the profiles in `conan/` (`gradle/conan.gradle.kts`), into `<module>/build/conan/<target>`. macOS
 and Linux take ConanCenter's prebuilt static bzip2 and liblzma; ConanCenter has only MSVC binaries for Windows, so
 bzip2, liblzma and sqlite3 are built there from the locked recipes with Kotlin/Native's own clang and mingw sysroot
-(CMake from `PATH`). ConanCenter has no Linux arm64 binaries, so `linuxArm64` compiles against the headers and links
-nothing yet.
+(CMake from `PATH`, and Ninja too on a Windows host). ConanCenter has no Linux arm64 binaries, so `linuxArm64`
+compiles against the headers and links nothing yet.
 
 Windows tests run on a Windows machine: copy `<module>/build/bin/mingwX64/debugTest/test.exe` there and run it
 (`:toml` wants `TOML_TEST_DIR` pointing at `toml/testdata/toml-test`).

@@ -7,6 +7,7 @@
 | Kotlin 2.4.21 | Gradle plugin | Compiler, Kotlin Multiplatform and Kotlin/Native | https://github.com/JetBrains/kotlin |
 | conan 2.33.0 | mise | Fetches (macOS, Linux) or builds (Windows) the static C libraries `:archive` and `:db-native` link | https://github.com/conan-io/conan |
 | CMake | system package | Conan's Windows builds of bzip2, xz_utils and sqlite3 | https://cmake.org |
+| Ninja | system package | CMake's generator for those builds on a Windows host, which has no make | https://github.com/ninja-build/ninja |
 | zlib | Kotlin/Native platform library (`platform.zlib`) | gzip, deflate and CRC-32 in `:archive` | https://zlib.net |
 | ci-diffuser | checkout at `../../apps/ci-diffuser` (or `CI_DIFFUSER_DIR`), local included build | Shared settings, ktlint and detekt | `apps/ci-diffuser` (no remote) |
 

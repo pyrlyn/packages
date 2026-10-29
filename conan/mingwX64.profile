@@ -4,6 +4,8 @@
 {% set deps = os.getenv("KONAN_DEPENDENCIES") %}
 {% set llvm = deps + "/" + os.getenv("KONAN_LLVM") %}
 {% set sysroot = deps + "/" + os.getenv("KONAN_MINGW") %}
+{% set windows = platform.system() == "Windows" %}
+{% set exe = ".exe" if windows else "" %}
 [settings]
 os=Windows
 arch=x86_64
@@ -15,18 +17,23 @@ compiler.exception=seh
 build_type=Release
 
 [conf]
-tools.build:compiler_executables={"c": "{{ llvm }}/bin/clang", "cpp": "{{ llvm }}/bin/clang++"}
+tools.build:compiler_executables={"c": "{{ llvm }}/bin/clang{{ exe }}", "cpp": "{{ llvm }}/bin/clang++{{ exe }}"}
 tools.build:cflags=["--target=x86_64-w64-mingw32", "--sysroot={{ sysroot }}"]
 tools.build:sharedlinkflags=["--target=x86_64-w64-mingw32", "--sysroot={{ sysroot }}", "-fuse-ld=lld"]
 tools.build:exelinkflags=["--target=x86_64-w64-mingw32", "--sysroot={{ sysroot }}", "-fuse-ld=lld"]
 tools.build:sysroot={{ sysroot }}
 tools.cmake.cmaketoolchain:system_name=Windows
 tools.cmake.cmaketoolchain:system_processor=AMD64
+{% if windows %}
+# Windows has no make for CMake's default MinGW generator; Ninja comes from PATH, as CMake does.
+tools.cmake.cmaketoolchain:generator=Ninja
+{% else %}
 # llvm-ar writes the symbol index itself; the host's ranlib would rewrite a COFF archive for its own format.
 tools.cmake.cmaketoolchain:extra_variables={"CMAKE_RANLIB": "true"}
+{% endif %}
 
 [buildenv]
-AR={{ llvm }}/bin/llvm-ar
+AR={{ llvm }}/bin/llvm-ar{{ exe }}
 
 [platform_tool_requires]
 cmake/3.31.12
