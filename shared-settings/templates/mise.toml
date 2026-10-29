@@ -1,0 +1,13 @@
+# mise task templates for ci-diffuser consumers; replace <app> with the executable's Gradle project.
+[tasks.release]
+description = "Release binary, full whole-program optimization (for shipping)"
+run = "./gradlew :<app>:linkReleaseExecutableMacosArm64"
+[tasks.release-fast]
+description = "Release binary from the K/N release binary cache; dev/CI only, never ship"
+run = "./gradlew :<app>:linkReleaseExecutableMacosArm64 -Pdiffuser.release.fast=true"
+[tasks.lint]
+description = "ktlint + detekt"
+run = "./gradlew ktlintCheck detekt"
+[tasks.format]
+description = "ktlint auto-format"
+run = "./gradlew ktlintFormat"
