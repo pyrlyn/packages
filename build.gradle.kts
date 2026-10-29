@@ -1,8 +1,8 @@
-// ktlint and detekt come from ci-diffuser, so this package lints like the projects that use it.
+// ktlint and detekt come from shared-settings, so this package lints like the projects that use it.
 plugins {
     kotlin("multiplatform") version "2.4.21" apply false
-    id("ci.diffuser.ktlint") apply false
-    id("ci.diffuser.detekt") apply false
+    id("shared.settings.ktlint") apply false
+    id("shared.settings.detekt") apply false
 }
 
 // Consumers include this build and name `pyrlyn.snapshot:snapshot`; Gradle
@@ -10,8 +10,8 @@ plugins {
 subprojects {
     group = "pyrlyn.snapshot"
     pluginManager.apply("org.jetbrains.kotlin.multiplatform")
-    pluginManager.apply("ci.diffuser.ktlint")
-    pluginManager.apply("ci.diffuser.detekt")
+    pluginManager.apply("shared.settings.ktlint")
+    pluginManager.apply("shared.settings.detekt")
     configure<org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension> {
         jvmToolchain(21)
         // Every target any consumer builds; a missing one would fail that consumer's resolution.

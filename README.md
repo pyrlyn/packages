@@ -18,8 +18,11 @@ its `.snap` files as they are.
 ## Use
 
 ```kotlin
-// settings.gradle.kts
-includeBuild(System.getenv("KOTLIN_SNAPSHOT_DIR") ?: "../../packages/kotlin-snapshot")
+// settings.gradle.kts (sharedBuild is the ancestor lookup in packages/shared-settings/README.md)
+pluginManagement {
+    extra["kotlinSnapshotDir"] = sharedBuild("kotlin-snapshot", "KOTLIN_SNAPSHOT_DIR")
+}
+includeBuild(extra["kotlinSnapshotDir"] as String)
 
 // build.gradle.kts
 sourceSets.commonTest.dependencies { implementation("pyrlyn.snapshot:snapshot") }
@@ -65,7 +68,7 @@ Targets: JVM, macOS arm64, Linux x64 and arm64, Windows x64, and Wasm (`wasmJs`,
 ./gradlew check
 ```
 
-`CI_DIFFUSER_DIR` points to a checkout of ci-diffuser, which provides ktlint and detekt.
+The `shared-settings` build in the workspace's `packages/` provides ktlint and detekt; `SHARED_SETTINGS_DIR` points elsewhere.
 
 ## Where tests live
 
