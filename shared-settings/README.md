@@ -1,6 +1,6 @@
 # shared-settings
 
-Shared Gradle build settings, used as a local included build (no remote, no publishing).
+Shared Gradle build settings, used as an included build from a checkout of [pyrlyn/packages](https://github.com/pyrlyn/packages) (not published to a plugin repository).
 
 It lives in the workspace's `packages/`. Consumer `settings.gradle.kts` looks it up in every
 ancestor directory, so the build works from the main checkout and from a worktree nested deeper

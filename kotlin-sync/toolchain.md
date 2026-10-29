@@ -6,8 +6,8 @@
 | Gradle 9.8.2 | wrapper (`./gradlew`) | Build | https://github.com/gradle/gradle |
 | Kotlin 2.4.21 | Gradle plugin | Compiler, Kotlin Multiplatform and Kotlin/Native | https://github.com/JetBrains/kotlin |
 | Buf CLI | Gradle (`build.buf:buf`, fetched by the kotlinx-rpc plugin) | Runs the protobuf code generation of `proto` | https://github.com/bufbuild/buf |
-| shared-settings | `packages/shared-settings` above the build (or `SHARED_SETTINGS_DIR`), local included build | Shared settings, ktlint and detekt | `packages/shared-settings` (no remote) |
-| kotlin-kit | `packages/kotlin-kit` above the build (or `KOTLIN_KIT_DIR`), local included build | `pyrlyn.kit:http`, the HTTP interface device login talks through | `packages/kotlin-kit` (no remote) |
+| shared-settings | `packages/shared-settings` above the build (or `SHARED_SETTINGS_DIR`), local included build | Shared settings, ktlint and detekt | https://github.com/pyrlyn/packages/tree/main/shared-settings |
+| kotlin-kit | `packages/kotlin-kit` above the build (or `KOTLIN_KIT_DIR`), local included build | `pyrlyn.kit:http`, the HTTP interface device login talks through | https://github.com/pyrlyn/packages/tree/main/kotlin-kit |
 
 ## Maven
 

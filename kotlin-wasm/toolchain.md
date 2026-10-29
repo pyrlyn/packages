@@ -5,7 +5,7 @@
 | JDK 21 | mise | Gradle and the JVM target | https://openjdk.org |
 | Gradle 9.7.1 | wrapper (`./gradlew`) | Build | https://github.com/gradle/gradle |
 | Kotlin 2.4.21 | Gradle plugin | Compiler, Kotlin Multiplatform | https://github.com/JetBrains/kotlin |
-| shared-settings | `packages/shared-settings` above the build (or `SHARED_SETTINGS_DIR`), local included build | Shared ktlint and detekt settings | `packages/shared-settings` (no remote) |
+| shared-settings | `packages/shared-settings` above the build (or `SHARED_SETTINGS_DIR`), local included build | Shared ktlint and detekt settings | https://github.com/pyrlyn/packages/tree/main/shared-settings |
 
 ## Maven
 
