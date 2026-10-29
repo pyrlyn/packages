@@ -1,0 +1,12 @@
+{
+    "version": "0.5",
+    "requires": [
+        "xz_utils/5.8.4#8f8f25b0e4c422a4469a6f7ead5b355c%1789627837.904",
+        "bzip2/1.0.8#c470882369c2d95c5c77e970c0c7e321%1762886692.465"
+    ],
+    "build_requires": [
+        "cmake/3.31.12#platform"
+    ],
+    "python_requires": [],
+    "config_requires": []
+}

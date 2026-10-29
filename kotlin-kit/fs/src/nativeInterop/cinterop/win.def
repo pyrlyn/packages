@@ -1,0 +1,86 @@
+package = fs.win
+---
+// Each Win32 call fs makes, with its GetLastError taken in C right after it. Read from Kotlin, the code can already
+// be gone: returning from a native call may park the thread for the collector, and the runtime's own Win32 calls
+// there overwrite the last error.
+#include <windows.h>
+#include <stddef.h>
+
+static __thread DWORD kit_err;
+
+/** The code the last wrapped call left, success or not; meaningful only after one that failed. */
+static inline DWORD kit_last_error(void) { return kit_err; }
+
+#define KIT_KEEP(call) do { __typeof__(call) r_ = (call); kit_err = GetLastError(); return r_; } while (0)
+
+static inline HANDLE kit_CreateFileW(LPCWSTR name, DWORD access, DWORD share, DWORD disposition, DWORD flags) {
+    KIT_KEEP(CreateFileW(name, access, share, NULL, disposition, flags, NULL));
+}
+static inline BOOL kit_GetFileInformationByHandle(HANDLE h, LPBY_HANDLE_FILE_INFORMATION info) {
+    KIT_KEEP(GetFileInformationByHandle(h, info));
+}
+static inline BOOL kit_GetFileInformationByHandleEx(HANDLE h, FILE_INFO_BY_HANDLE_CLASS what, LPVOID buf, DWORD size) {
+    KIT_KEEP(GetFileInformationByHandleEx(h, what, buf, size));
+}
+static inline BOOL kit_DeviceIoControl(HANDLE h, DWORD code, LPVOID out, DWORD size, LPDWORD got) {
+    KIT_KEEP(DeviceIoControl(h, code, NULL, 0, out, size, got, NULL));
+}
+static inline BOOL kit_CreateDirectoryW(LPCWSTR name) { KIT_KEEP(CreateDirectoryW(name, NULL)); }
+static inline HANDLE kit_FindFirstFileW(LPCWSTR pattern, LPWIN32_FIND_DATAW found) { KIT_KEEP(FindFirstFileW(pattern, found)); }
+static inline BOOL kit_FindNextFileW(HANDLE find, LPWIN32_FIND_DATAW found) { KIT_KEEP(FindNextFileW(find, found)); }
+static inline DWORD kit_GetFinalPathNameByHandleW(HANDLE h, LPWSTR buf, DWORD size) {
+    KIT_KEEP(GetFinalPathNameByHandleW(h, buf, size, 0));
+}
+static inline BOOL kit_ReadFile(HANDLE h, LPVOID buf, DWORD size, LPDWORD got) { KIT_KEEP(ReadFile(h, buf, size, got, NULL)); }
+static inline BOOL kit_WriteFile(HANDLE h, LPCVOID buf, DWORD size, LPDWORD put) { KIT_KEEP(WriteFile(h, buf, size, put, NULL)); }
+static inline BOOL kit_FlushFileBuffers(HANDLE h) { KIT_KEEP(FlushFileBuffers(h)); }
+static inline BOOL kit_MoveFileExW(LPCWSTR from, LPCWSTR to, DWORD flags) { KIT_KEEP(MoveFileExW(from, to, flags)); }
+// Rust `fs::rename`'s fallback when MoveFileExW is refused: a rename by handle with POSIX semantics, which replaces
+// a target another process has open. Older MinGW headers lack the Ex class and its flags; the values are Windows'.
+#ifndef FILE_RENAME_FLAG_REPLACE_IF_EXISTS
+#define FILE_RENAME_FLAG_REPLACE_IF_EXISTS 0x1
+#endif
+#ifndef FILE_RENAME_FLAG_POSIX_SEMANTICS
+#define FILE_RENAME_FLAG_POSIX_SEMANTICS 0x2
+#endif
+#define KIT_FILE_RENAME_INFO_EX ((FILE_INFO_BY_HANDLE_CLASS) 22)
+static inline BOOL kit_rename_posix(LPCWSTR from, LPCWSTR to) {
+    // The rename takes a full path with backslashes only: below Win32, nothing turns a slash into a backslash.
+    DWORD full = GetFullPathNameW(to, 0, NULL, NULL);
+    if (full == 0) { kit_err = GetLastError(); return FALSE; }
+    DWORD name = (full - 1) * sizeof(WCHAR);
+    DWORD size = (DWORD) offsetof(FILE_RENAME_INFO, FileName) + name + sizeof(WCHAR);
+    FILE_RENAME_INFO* info = (FILE_RENAME_INFO*) HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
+    if (info == NULL) { kit_err = ERROR_NOT_ENOUGH_MEMORY; return FALSE; }
+    BOOL ok = FALSE;
+    if (GetFullPathNameW(to, full, info->FileName, NULL) == full - 1) {
+        // The flags share the first field with the older ReplaceIfExists, which some headers name alone.
+        *(DWORD*) info = FILE_RENAME_FLAG_REPLACE_IF_EXISTS | FILE_RENAME_FLAG_POSIX_SEMANTICS;
+        info->FileNameLength = name;
+        HANDLE h = CreateFileW(from, DELETE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING,
+            FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, NULL);
+        if (h != INVALID_HANDLE_VALUE) {
+            ok = SetFileInformationByHandle(h, KIT_FILE_RENAME_INFO_EX, info, size);
+            kit_err = GetLastError();
+            CloseHandle(h);
+        } else {
+            kit_err = GetLastError();
+        }
+    } else {
+        kit_err = GetLastError();
+    }
+    HeapFree(GetProcessHeap(), 0, info);
+    return ok;
+}
+static inline BOOL kit_DeleteFileW(LPCWSTR name) { KIT_KEEP(DeleteFileW(name)); }
+static inline BOOL kit_RemoveDirectoryW(LPCWSTR name) { KIT_KEEP(RemoveDirectoryW(name)); }
+static inline DWORD kit_GetFileAttributesW(LPCWSTR name) { KIT_KEEP(GetFileAttributesW(name)); }
+static inline BOOL kit_SetFileAttributesW(LPCWSTR name, DWORD attrs) { KIT_KEEP(SetFileAttributesW(name, attrs)); }
+static inline BOOL kit_CreateHardLinkW(LPCWSTR link, LPCWSTR original) { KIT_KEEP(CreateHardLinkW(link, original, NULL)); }
+static inline BOOLEAN kit_CreateSymbolicLinkW(LPCWSTR link, LPCWSTR target, DWORD flags) {
+    KIT_KEEP(CreateSymbolicLinkW(link, target, flags));
+}
+static inline BOOL kit_GetFileTime(HANDLE h, LPFILETIME modified) { KIT_KEEP(GetFileTime(h, NULL, NULL, modified)); }
+static inline BOOL kit_SetFileTime(HANDLE h, const FILETIME* accessed, const FILETIME* modified) {
+    KIT_KEEP(SetFileTime(h, NULL, accessed, modified));
+}

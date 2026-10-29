@@ -1,0 +1,212 @@
+package = process.spawnwin
+---
+// Windows children for the process module. Each call returns its Win32 error (0 on success) itself: read from
+// Kotlin, GetLastError can already be gone, since returning from a native call may park the thread for the
+// collector, and the runtime's own Win32 calls overwrite it there.
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+typedef struct {
+    HANDLE process;
+    HANDLE job;
+    HANDLE out;
+    HANDLE err;
+    DWORD pid;
+} kit_child;
+
+static DWORD kit_fail(HANDLE* close, int n) {
+    DWORD e = GetLastError();
+    for (int i = 0; i < n; i++) if (close[i]) CloseHandle(close[i]);
+    return e;
+}
+
+/* An inheritable read handle on [path], or on NUL when it is null: the child's stdin. */
+static HANDLE kit_open_stdin(LPCWSTR path) {
+    SECURITY_ATTRIBUTES sa = { sizeof(sa), NULL, TRUE };
+    HANDLE h = CreateFileW(path ? path : L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                           &sa, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    return h == INVALID_HANDLE_VALUE ? NULL : h;
+}
+
+/* A pipe whose write end the child inherits and whose read end stays ours alone. */
+static BOOL kit_pipe(HANDLE* read, HANDLE* write) {
+    SECURITY_ATTRIBUTES sa = { sizeof(sa), NULL, TRUE };
+    if (!CreatePipe(read, write, &sa, 0)) return FALSE;
+    if (SetHandleInformation(*read, HANDLE_FLAG_INHERIT, 0)) return TRUE;
+    DWORD e = GetLastError();
+    CloseHandle(*read);
+    CloseHandle(*write);
+    SetLastError(e);
+    return FALSE;
+}
+
+/* A copy of one of our own std handles the child may inherit; NULL when there is none. */
+static HANDLE kit_inheritable(DWORD which) {
+    HANDLE h = GetStdHandle(which), copy = NULL;
+    if (h == NULL || h == INVALID_HANDLE_VALUE) return NULL;
+    if (!DuplicateHandle(GetCurrentProcess(), h, GetCurrentProcess(), &copy, 0, TRUE, DUPLICATE_SAME_ACCESS)) return NULL;
+    return copy;
+}
+
+/*
+ * CreateProcessW with exactly [std] inherited: the handle list keeps a pipe meant for one child out of another that
+ * starts at the same moment, which Rust guards with a process-wide lock instead. The child starts suspended so it
+ * is in [job] before it can start anything of its own.
+ */
+static DWORD kit_create(LPCWSTR app, LPWSTR cmdline, LPVOID env, LPCWSTR dir, DWORD flags, HANDLE std[3], HANDLE job,
+                        HANDLE* process, DWORD* pid) {
+    HANDLE list[3];
+    DWORD n = 0;
+    for (int i = 0; i < 3; i++) {
+        int seen = 0;
+        for (DWORD j = 0; j < n; j++) seen |= list[j] == std[i];
+        if (std[i] && !seen) list[n++] = std[i];
+    }
+    SIZE_T size = 0;
+    InitializeProcThreadAttributeList(NULL, 1, 0, &size);
+    LPPROC_THREAD_ATTRIBUTE_LIST attrs = HeapAlloc(GetProcessHeap(), 0, size);
+    if (!attrs) return ERROR_NOT_ENOUGH_MEMORY;
+    DWORD rc = 0;
+    if (!InitializeProcThreadAttributeList(attrs, 1, 0, &size)) {
+        rc = GetLastError();
+        HeapFree(GetProcessHeap(), 0, attrs);
+        return rc;
+    }
+    if (n > 0 && !UpdateProcThreadAttribute(attrs, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, list, n * sizeof(HANDLE), NULL, NULL)) {
+        rc = GetLastError();
+    }
+    STARTUPINFOEXW si;
+    ZeroMemory(&si, sizeof(si));
+    si.StartupInfo.cb = sizeof(si);
+    si.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+    si.StartupInfo.hStdInput = std[0];
+    si.StartupInfo.hStdOutput = std[1];
+    si.StartupInfo.hStdError = std[2];
+    si.lpAttributeList = attrs;
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&pi, sizeof(pi));
+    DWORD all = flags | CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT | (job ? CREATE_SUSPENDED : 0);
+    if (rc == 0 && !CreateProcessW(app, cmdline, NULL, NULL, n > 0, all, env, dir, &si.StartupInfo, &pi)) rc = GetLastError();
+    DeleteProcThreadAttributeList(attrs);
+    HeapFree(GetProcessHeap(), 0, attrs);
+    if (rc != 0) return rc;
+    if (job && !AssignProcessToJobObject(job, pi.hProcess)) {
+        rc = GetLastError();
+        TerminateProcess(pi.hProcess, 1);
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+        return rc;
+    }
+    if (job) ResumeThread(pi.hThread);
+    CloseHandle(pi.hThread);
+    *process = pi.hProcess;
+    *pid = pi.dwProcessId;
+    return 0;
+}
+
+/*
+ * A job that ends its processes when the last handle on it closes, so a crash here leaves no child behind. A child may
+ * still break away: one it detaches is meant to outlive it, and closing this job would otherwise end that one too.
+ */
+static HANDLE kit_job(void) {
+    HANDLE job = CreateJobObjectW(NULL, NULL);
+    if (!job) return NULL;
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits;
+    ZeroMemory(&limits, sizeof(limits));
+    limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_BREAKAWAY_OK;
+    if (SetInformationJobObject(job, JobObjectExtendedLimitInformation, &limits, sizeof(limits))) return job;
+    DWORD e = GetLastError();
+    CloseHandle(job);
+    SetLastError(e);
+    return NULL;
+}
+
+/*
+ * The bounded child: stdin from [stdin_path] or NUL, stdout and stderr into pipes, no console window and a process
+ * group of its own (so a Ctrl+C aimed at us is not delivered to it), in a job of its own.
+ */
+static DWORD kit_spawn_piped(LPCWSTR app, LPWSTR cmdline, LPVOID env, LPCWSTR dir, LPCWSTR stdin_path, kit_child* child) {
+    HANDLE in = NULL, out_r = NULL, out_w = NULL, err_r = NULL, err_w = NULL, job = NULL;
+    if (!(in = kit_open_stdin(stdin_path))) return GetLastError();
+    if (!kit_pipe(&out_r, &out_w)) { HANDLE c[] = { in }; return kit_fail(c, 1); }
+    if (!kit_pipe(&err_r, &err_w)) { HANDLE c[] = { in, out_r, out_w }; return kit_fail(c, 3); }
+    if (!(job = kit_job())) { HANDLE c[] = { in, out_r, out_w, err_r, err_w }; return kit_fail(c, 5); }
+    HANDLE std[3] = { in, out_w, err_w };
+    HANDLE process = NULL;
+    DWORD pid = 0;
+    DWORD rc = kit_create(app, cmdline, env, dir, CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP, std, job, &process, &pid);
+    // The child has its copies; keeping the write ends would mean never seeing end of file.
+    CloseHandle(in);
+    CloseHandle(out_w);
+    CloseHandle(err_w);
+    if (rc != 0) {
+        CloseHandle(out_r);
+        CloseHandle(err_r);
+        CloseHandle(job);
+        return rc;
+    }
+    child->process = process;
+    child->job = job;
+    child->out = out_r;
+    child->err = err_r;
+    child->pid = pid;
+    return 0;
+}
+
+/* The interactive child: our own std handles and console, no job, nothing captured. */
+static DWORD kit_spawn_inherit(LPCWSTR app, LPWSTR cmdline, LPVOID env, LPCWSTR dir, kit_child* child) {
+    HANDLE std[3] = { kit_inheritable(STD_INPUT_HANDLE), kit_inheritable(STD_OUTPUT_HANDLE), kit_inheritable(STD_ERROR_HANDLE) };
+    HANDLE process = NULL;
+    DWORD pid = 0;
+    DWORD rc = kit_create(app, cmdline, env, dir, 0, std, NULL, &process, &pid);
+    for (int i = 0; i < 3; i++) if (std[i]) CloseHandle(std[i]);
+    if (rc != 0) return rc;
+    ZeroMemory(child, sizeof(*child));
+    child->process = process;
+    child->pid = pid;
+    return 0;
+}
+
+/*
+ * A child left to run on its own: NUL for all three std handles, no console window, a process group of its own and out
+ * of any job this process is in, so it outlives this process and whoever ran it. A job that forbids leaving keeps it,
+ * which is still better than not starting it. Only its pid comes back.
+ */
+static DWORD kit_spawn_detached(LPCWSTR app, LPWSTR cmdline, LPVOID env, LPCWSTR dir, DWORD* pid) {
+    SECURITY_ATTRIBUTES sa = { sizeof(sa), NULL, TRUE };
+    HANDLE in = kit_open_stdin(NULL);
+    if (!in) return GetLastError();
+    HANDLE out = CreateFileW(L"NUL", GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (out == INVALID_HANDLE_VALUE) { HANDLE c[] = { in }; return kit_fail(c, 1); }
+    HANDLE std[3] = { in, out, out };
+    HANDLE process = NULL;
+    DWORD flags = CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP;
+    DWORD rc = kit_create(app, cmdline, env, dir, flags | CREATE_BREAKAWAY_FROM_JOB, std, NULL, &process, pid);
+    if (rc == ERROR_ACCESS_DENIED) rc = kit_create(app, cmdline, env, dir, flags, std, NULL, &process, pid);
+    CloseHandle(in);
+    CloseHandle(out);
+    if (rc == 0) CloseHandle(process);
+    return rc;
+}
+
+/* 0 with [code] set once the process has ended, WAIT_TIMEOUT while it runs, another error when it cannot be waited on. */
+static DWORD kit_wait(HANDLE process, DWORD ms, DWORD* code) {
+    DWORD w = WaitForSingleObject(process, ms);
+    if (w == WAIT_TIMEOUT) return WAIT_TIMEOUT;
+    if (w != WAIT_OBJECT_0) return GetLastError();
+    return GetExitCodeProcess(process, code) ? 0 : GetLastError();
+}
+
+/* Bytes waiting in a pipe; ERROR_BROKEN_PIPE once its last writer has closed and it is empty. */
+static DWORD kit_peek(HANDLE pipe, DWORD* available) {
+    return PeekNamedPipe(pipe, NULL, 0, NULL, available, NULL) ? 0 : GetLastError();
+}
+
+static DWORD kit_read(HANDLE pipe, void* buf, DWORD size, DWORD* got) {
+    return ReadFile(pipe, buf, size, got, NULL) ? 0 : GetLastError();
+}
+
+/* The job reaches a grandchild whose parent has already exited, which a walk of parent ids cannot find. */
+static void kit_kill_tree(HANDLE job, HANDLE process) {
+    if (!job || !TerminateJobObject(job, 1)) TerminateProcess(process, 1);
+}

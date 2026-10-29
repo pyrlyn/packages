@@ -1,0 +1,13 @@
+package = db.native.sqlite
+headers = sqlite3.h
+headerFilter = sqlite3.h
+---
+// SQLITE_TRANSIENT is a cast cinterop cannot express: SQLite copies the bytes before these return. The data is
+// untyped so a Kotlin String is not turned into a NUL-terminated C string on the way.
+static inline int kit_bind_text(sqlite3_stmt *st, int i, const void *utf8, int n) {
+    return sqlite3_bind_text(st, i, (const char *)utf8, n, SQLITE_TRANSIENT);
+}
+
+static inline int kit_bind_blob(sqlite3_stmt *st, int i, const void *bytes, int n) {
+    return sqlite3_bind_blob(st, i, bytes, n, SQLITE_TRANSIENT);
+}

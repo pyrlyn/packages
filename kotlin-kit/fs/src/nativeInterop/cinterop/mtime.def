@@ -1,0 +1,47 @@
+# File modification times. `struct stat` names the field `st_mtimespec` on macOS and `st_mtim` on Linux, and Kotlin
+# code shared by both sees only what the two have in common, so the field is read here in C.
+headerFilter = kit-none
+package = fs.mtime
+
+---
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <time.h>
+
+/* How many nanoseconds ago `path` was last modified, against the wall clock; 0 when that is in the future. */
+static inline int kit_modified_ago(const char *path, long long *ago_ns) {
+    struct stat st;
+    struct timespec now;
+    if (stat(path, &st) != 0) return errno;
+    if (clock_gettime(CLOCK_REALTIME, &now) != 0) return errno;
+#ifdef __APPLE__
+    struct timespec m = st.st_mtimespec;
+#else
+    struct timespec m = st.st_mtim;
+#endif
+    long long diff = (long long)(now.tv_sec - m.tv_sec) * 1000000000LL + (now.tv_nsec - m.tv_nsec);
+    *ago_ns = diff > 0 ? diff : 0;
+    return 0;
+}
+
+/* Set the modification time of `path` to `ago_ns` nanoseconds before now, leaving the access time alone. */
+static inline int kit_set_modified_ago(const char *path, long long ago_ns) {
+    struct timespec now, times[2];
+    if (clock_gettime(CLOCK_REALTIME, &now) != 0) return errno;
+    long long at = (long long)now.tv_sec * 1000000000LL + now.tv_nsec - ago_ns;
+    times[0].tv_sec = 0;
+    times[0].tv_nsec = UTIME_OMIT;
+    times[1].tv_sec = (time_t)(at / 1000000000LL);
+    times[1].tv_nsec = (long)(at % 1000000000LL);
+    return utimensat(AT_FDCWD, path, times, 0) == 0 ? 0 : errno;
+}
+
+/* Set both the access and the modification time of `path` to `seconds` since the epoch. */
+static inline int kit_set_times(const char *path, long long seconds) {
+    struct timespec times[2];
+    times[0].tv_sec = (time_t)seconds;
+    times[0].tv_nsec = 0;
+    times[1] = times[0];
+    return utimensat(AT_FDCWD, path, times, 0) == 0 ? 0 : errno;
+}

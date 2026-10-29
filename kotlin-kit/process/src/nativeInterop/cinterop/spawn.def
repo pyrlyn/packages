@@ -1,0 +1,137 @@
+# posix_spawn, the process environment and this process's own executable, which Kotlin/Native's platform.posix does
+# not export on macOS. The spawn
+# set-up is done here in C because posix_spawn's types are a pointer on macOS and a struct on Linux, and Kotlin code
+# shared by both sees only what the two have in common.
+headers = spawn.h signal.h fcntl.h unistd.h
+# Only the kit_* helpers below are bound; the headers are there for them.
+headerFilter = kit-none
+package = process.spawn
+linkerOpts.linux = -ldl
+
+---
+#include <errno.h>
+#ifdef __APPLE__
+#include <crt_externs.h>
+#include <mach-o/dyld.h>
+#else
+#include <dlfcn.h>
+/* glibc declares it only under _GNU_SOURCE, which the headers above were read without; it is the null handle. */
+#ifndef RTLD_DEFAULT
+#define RTLD_DEFAULT ((void *) 0)
+#endif
+extern char **environ;
+#endif
+
+/* The environment this process was started with; a child given extra variables gets these plus its own. */
+static inline char **kit_environ(void) {
+#ifdef __APPLE__
+    return *_NSGetEnviron();
+#else
+    return environ;
+#endif
+}
+
+/*
+ * Start the child in `dir`. glibc has the call from 2.29 on, newer than the sysroot Kotlin/Native links against, so
+ * it is looked up when it is first needed; an older glibc gets ENOSYS.
+ */
+static inline int kit_addchdir(posix_spawn_file_actions_t *actions, const char *dir) {
+#ifdef __APPLE__
+    return posix_spawn_file_actions_addchdir_np(actions, dir);
+#else
+    typedef int (*addchdir_fn)(posix_spawn_file_actions_t *, const char *);
+    static addchdir_fn fn;
+    if (!fn) fn = (addchdir_fn)dlsym(RTLD_DEFAULT, "posix_spawn_file_actions_addchdir_np");
+    return fn ? fn(actions, dir) : ENOSYS;
+#endif
+}
+
+/* A pipe whose ends a child spawned at the same time does not inherit; the dup2 below clears it on the copies. */
+static inline int kit_pipe(int fds[2]) {
+    if (pipe(fds) != 0) return errno;
+    fcntl(fds[0], F_SETFD, FD_CLOEXEC);
+    fcntl(fds[1], F_SETFD, FD_CLOEXEC);
+    return 0;
+}
+
+/*
+ * Spawn `program` (looked up on PATH) with stdin on `in_path` (/dev/null when it is null), stdout and stderr on the
+ * given pipe ends, in `dir` when it is not null, as the leader of its own process group, with SIGPIPE at its default and no signal blocked,
+ * as Rust's Command starts a child. Returns 0 or the errno.
+ */
+static inline int kit_spawn(int *pid, const char *program, char *const argv[], char *const envp[], const char *dir,
+                            const char *in_path, int out_fd, int err_fd) {
+    posix_spawn_file_actions_t actions;
+    posix_spawnattr_t attr;
+    sigset_t defaults, mask;
+    int rc = posix_spawn_file_actions_init(&actions);
+    if (rc) return rc;
+    rc = posix_spawnattr_init(&attr);
+    if (rc) {
+        posix_spawn_file_actions_destroy(&actions);
+        return rc;
+    }
+    /* A file or nothing, never this process's stdin: a child waiting on input would sit out the deadline. */
+    rc = posix_spawn_file_actions_addopen(&actions, 0, in_path ? in_path : "/dev/null", O_RDONLY, 0);
+    if (!rc) rc = posix_spawn_file_actions_adddup2(&actions, out_fd, 1);
+    if (!rc) rc = posix_spawn_file_actions_adddup2(&actions, err_fd, 2);
+    if (!rc && dir) rc = kit_addchdir(&actions, dir);
+    /* Its own group, so the child and everything it starts are one kill target. */
+    if (!rc) rc = posix_spawnattr_setpgroup(&attr, 0);
+    sigemptyset(&defaults);
+    sigaddset(&defaults, SIGPIPE);
+    sigemptyset(&mask);
+    if (!rc) rc = posix_spawnattr_setsigdefault(&attr, &defaults);
+    if (!rc) rc = posix_spawnattr_setsigmask(&attr, &mask);
+    if (!rc) rc = posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK);
+    pid_t child = 0;
+    if (!rc) rc = posix_spawnp(&child, program, &actions, &attr, argv, envp);
+    if (!rc) *pid = (int)child;
+    posix_spawnattr_destroy(&attr);
+    posix_spawn_file_actions_destroy(&actions);
+    return rc;
+}
+
+/*
+ * Spawn `program` sharing this process's stdin, stdout, stderr and process group, for a child that talks to the
+ * person at the terminal (a password prompt must be able to read it). Signal set-up as in kit_spawn.
+ */
+static inline int kit_spawn_inherit(int *pid, const char *program, char *const argv[], char *const envp[],
+                                    const char *dir) {
+    posix_spawn_file_actions_t actions;
+    posix_spawnattr_t attr;
+    sigset_t defaults, mask;
+    int rc = posix_spawn_file_actions_init(&actions);
+    if (rc) return rc;
+    rc = posix_spawnattr_init(&attr);
+    if (rc) {
+        posix_spawn_file_actions_destroy(&actions);
+        return rc;
+    }
+    if (dir) rc = kit_addchdir(&actions, dir);
+    sigemptyset(&defaults);
+    sigaddset(&defaults, SIGPIPE);
+    sigemptyset(&mask);
+    if (!rc) rc = posix_spawnattr_setsigdefault(&attr, &defaults);
+    if (!rc) rc = posix_spawnattr_setsigmask(&attr, &mask);
+    if (!rc) rc = posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK);
+    pid_t child = 0;
+    if (!rc) rc = posix_spawnp(&child, program, &actions, &attr, argv, envp);
+    if (!rc) *pid = (int)child;
+    posix_spawnattr_destroy(&attr);
+    posix_spawn_file_actions_destroy(&actions);
+    return rc;
+}
+
+/* The path this process was started from, links not resolved, into `buf`; 0 or -1 when it does not fit or is unknown. */
+static inline int kit_exe_path(char *buf, int size) {
+#ifdef __APPLE__
+    uint32_t n = (uint32_t)size;
+    return _NSGetExecutablePath(buf, &n) == 0 ? 0 : -1;
+#else
+    ssize_t n = readlink("/proc/self/exe", buf, (size_t)size - 1);
+    if (n < 0 || n >= size - 1) return -1;
+    buf[n] = 0;
+    return 0;
+#endif
+}
