@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+// Usage statistics shared by every product: opt-in, aggregated counters only, never
+// content. Semantics: docs/usage.md.
+package pyrlyn.usage.v1;
+
+import "pyrlyn/common/v1/common.proto";
+import "pyrlyn/sync/v1/sync.proto";
+
+// Collects daily usage counters from opted-in devices. Every call needs a bearer token;
+// authorization and errors are those of `pyrlyn.sync.v1.SyncService` (docs/sync.md).
+service UsageService {
+  // Adds counters to the scope's statistics. A retry with the same `report_id` adds
+  // nothing.
+  rpc ReportUsage(ReportUsageRequest) returns (ReportUsageResponse);
+}
+
+// Counters a device gathered since its last report.
+message ReportUsageRequest {
+  // Product and device making the call; the device must be opted in to `scope`.
+  pyrlyn.common.v1.ClientInfo client = 1;
+  // Whose statistics the counters add to.
+  pyrlyn.sync.v1.Scope scope = 2;
+  // Client-generated unique id (UUIDv7), so a retried report counts once.
+  string report_id = 3;
+  // Counters; entries with the same name and day are summed.
+  repeated Counter counters = 4;
+}
+
+// An amount a device counted on one day.
+message Counter {
+  // Product-defined counter name, `[a-z0-9_.-]`, 1-64 bytes, for example "commands".
+  string name = 1;
+  // Amount added, at most 2147483647; 0 is ignored.
+  uint32 value = 2;
+  // Client wall-clock time of the counting, clamped by the server; picks the UTC day.
+  int64 observed_at_unix_ms = 3;
+}
+
+// Confirms the report.
+message ReportUsageResponse {}

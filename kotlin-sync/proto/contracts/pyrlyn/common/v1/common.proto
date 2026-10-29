@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+// Messages shared by every product's sync service.
+package pyrlyn.common.v1;
+
+// Identifies the app instance making a call, for quotas, usage statistics and support.
+message ClientInfo {
+  // Product slug, for example "rtok" or "cox".
+  string product = 1;
+  // App version as the app reports it (semver).
+  string version = 2;
+  // Stable random id of this device, created on first login; never a hardware id.
+  string device_id = 3;
+  // Target triple or OS-arch pair, for example "macos-aarch64".
+  string platform = 4;
+}
+
+// Asks for one page of a list. An empty cursor asks for the first page.
+message PageRequest {
+  // Opaque cursor from the previous PageResponse.next_cursor.
+  string cursor = 1;
+  // Maximum items to return; 0 means the server default.
+  uint32 limit = 2;
+}
+
+// Describes where the next page starts.
+message PageResponse {
+  // Opaque cursor for the next page; empty when this was the last page.
+  string next_cursor = 1;
+}

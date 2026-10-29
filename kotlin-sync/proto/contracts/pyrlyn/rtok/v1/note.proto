@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+// rtok's sync record payloads. Mapping and identity rules: docs/sync.md, "rtok mapping".
+package pyrlyn.rtok.v1;
+
+// One rtok memory note: the payload of sync records of kind "note". The record id is the
+// lowercase hex SHA-256 of `project_key NUL note_kind NUL title`, so the same note written
+// on two devices is one record.
+message Note {
+  // rtok's own note kind, for example "decision" or "gotcha".
+  string note_kind = 1;
+  // Title, unique within the project and note kind.
+  string title = 2;
+  // Note text.
+  string body = 3;
+  // `host/owner/repo` of the project's origin URL; empty for a global note.
+  string project_key = 4;
+  // Shown first in rtok's recall.
+  bool pinned = 5;
+  // Soft retirement inside rtok, not a sync tombstone: retiring and restoring sync as edits.
+  bool retired = 6;
+  // Record id of the note that replaces this one; empty when none does.
+  string superseded_by = 7;
+  // Repository-relative paths of the files the note links.
+  repeated string linked_files = 8;
+}
