@@ -8,9 +8,14 @@ dependencies {
 gradlePlugin {
     plugins {
         register("settings") {
-            id = "ci.diffuser.settings"
-            implementationClass = "ci.diffuser.SettingsConventionPlugin"
+            id = "shared.settings"
+            implementationClass = "shared.settings.SettingsConventionPlugin"
             description = "Settings plugin: shared repositories and the optional S3/R2 remote build cache"
+        }
+        // The pre-rename id; see the legacy ids in ../build.gradle.kts.
+        register("legacy-settings") {
+            id = "ci.diffuser.settings"
+            implementationClass = "shared.settings.SettingsConventionPlugin"
         }
     }
 }

@@ -1,4 +1,4 @@
-package ci.diffuser
+package shared.settings
 
 import com.github.burrunan.s3cache.AwsS3BuildCache
 import org.gradle.api.Plugin

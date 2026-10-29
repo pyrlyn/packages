@@ -1,4 +1,4 @@
-package ci.diffuser
+package shared.settings
 
 import dev.detekt.gradle.Detekt
 import dev.detekt.gradle.extensions.DetektExtension
@@ -8,7 +8,7 @@ import org.gradle.api.tasks.testing.AbstractTestTask
 
 /**
  * detekt (dev.detekt) for one Kotlin module.
- * Config: detekt defaults + shared ci-diffuser detekt.yml + optional `<root>/config/detekt/detekt.yml` override.
+ * Config: detekt defaults + shared shared-settings detekt.yml + optional `<root>/config/detekt/detekt.yml` override.
  * Baseline: `<module>/detekt-baseline.xml` (create/refresh with `detektBaseline`; missing file = no baseline).
  * Task `detekt` (source-only analysis, works for KMP/Kotlin Native) is wired into `check`, and every
  * test task depends on it, so it runs before tests. No detekt-formatting: formatting stays with ktlint.
@@ -16,7 +16,7 @@ import org.gradle.api.tasks.testing.AbstractTestTask
 class DetektConventionPlugin : Plugin<Project> {
     override fun apply(project: Project) {
         project.pluginManager.apply("dev.detekt")
-        val shared = project.rootProject.layout.buildDirectory.file("ci-diffuser/detekt.yml")
+        val shared = project.rootProject.layout.buildDirectory.file("shared-settings/detekt.yml")
         val sharedFile = shared.get().asFile
         if (!sharedFile.exists() || sharedFile.readText() != SHARED) {
             sharedFile.parentFile.mkdirs()
@@ -40,6 +40,6 @@ class DetektConventionPlugin : Plugin<Project> {
 
     private companion object {
         val SHARED: String = DetektConventionPlugin::class.java
-            .getResourceAsStream("/ci/diffuser/detekt.yml")!!.bufferedReader().readText()
+            .getResourceAsStream("/shared/settings/detekt.yml")!!.bufferedReader().readText()
     }
 }

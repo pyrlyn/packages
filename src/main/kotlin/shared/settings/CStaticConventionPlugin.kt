@@ -1,4 +1,4 @@
-package ci.diffuser
+package shared.settings
 
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -11,7 +11,7 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
  *
  * Usage in a module build script:
  * ```
- * plugins { id("ci.diffuser.cstatic") }
+ * plugins { id("shared.settings.cstatic") }
  * diffuserCStatic { library(name = "rtok_spawn", cinterop = "spawn") }
  * ```
  * Sources: `src/nativeInterop/c/<name>.c` (+ headers in the same dir). Output: `build/native/macosArm64/lib<name>.a`.

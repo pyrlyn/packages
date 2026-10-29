@@ -20,9 +20,9 @@ val genVersions = tasks.register("genVersions") {
     inputs.property("json", jsonVersion)
     outputs.dir(genDir)
     doLast {
-        val f = genDir.get().file("ci/diffuser/Versions.kt").asFile
+        val f = genDir.get().file("shared/settings/Versions.kt").asFile
         f.parentFile.mkdirs()
-        f.writeText("package ci.diffuser\n\ninternal object Versions {\n    const val KTLINT = \"$ktlintVersion\"\n    const val KOTEST = \"$kotestVersion\"\n    const val SERIALIZATION_JSON = \"$jsonVersion\"\n}\n")
+        f.writeText("package shared.settings\n\ninternal object Versions {\n    const val KTLINT = \"$ktlintVersion\"\n    const val KOTEST = \"$kotestVersion\"\n    const val SERIALIZATION_JSON = \"$jsonVersion\"\n}\n")
     }
 }
 kotlin.sourceSets.main { kotlin.srcDir(genVersions) }
@@ -32,29 +32,37 @@ dependencies {
 gradlePlugin {
     plugins {
         register("native") {
-            id = "ci.diffuser.native"
-            implementationClass = "ci.diffuser.NativeConventionPlugin"
+            id = "shared.settings.native"
+            implementationClass = "shared.settings.NativeConventionPlugin"
             description = "Kotlin/Native dev and release build settings for every subproject using Kotlin Multiplatform"
         }
         register("detekt") {
-            id = "ci.diffuser.detekt"
-            implementationClass = "ci.diffuser.DetektConventionPlugin"
-            description = "detekt static analysis with the shared ci-diffuser config; detekt runs before every test task"
+            id = "shared.settings.detekt"
+            implementationClass = "shared.settings.DetektConventionPlugin"
+            description = "detekt static analysis with the shared config; detekt runs before every test task"
         }
         register("kmp") {
-            id = "ci.diffuser.kmp"
-            implementationClass = "ci.diffuser.KmpConventionPlugin"
+            id = "shared.settings.kmp"
+            implementationClass = "shared.settings.KmpConventionPlugin"
             description = "Root plugin: KMP + serialization + Dokka + KSP/Kotest for every subproject, aggregated Dokka, opt-in Kover coverage"
         }
         register("cstatic") {
-            id = "ci.diffuser.cstatic"
-            implementationClass = "ci.diffuser.CStaticConventionPlugin"
+            id = "shared.settings.cstatic"
+            implementationClass = "shared.settings.CStaticConventionPlugin"
             description = "Compile a module's own C helpers into a static library linked via cinterop staticLibraries"
         }
         register("ktlint") {
-            id = "ci.diffuser.ktlint"
-            implementationClass = "ci.diffuser.KtlintConventionPlugin"
+            id = "shared.settings.ktlint"
+            implementationClass = "shared.settings.KtlintConventionPlugin"
             description = "ktlint check/format for a Kotlin module; ktlintCheck runs before every test task"
+        }
+        // The pre-rename ids, for branches made before the move that still reach this build through the
+        // apps/ci-diffuser symlink. Remove them with the symlink once every consumer uses shared.settings.*.
+        for (name in listOf("native", "detekt", "kmp", "cstatic", "ktlint")) {
+            register("legacy-$name") {
+                id = "ci.diffuser.$name"
+                implementationClass = getByName(name).implementationClass
+            }
         }
     }
 }

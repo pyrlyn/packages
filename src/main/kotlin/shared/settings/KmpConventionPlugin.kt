@@ -1,4 +1,4 @@
-package ci.diffuser
+package shared.settings
 
 import kotlinx.kover.gradle.plugin.dsl.KoverProjectExtension
 import org.gradle.api.Plugin
@@ -6,7 +6,7 @@ import org.gradle.api.Project
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 
 /**
- * Applied once in the root build script (next to `ci.diffuser.native`). The consumer declares the plugins with
+ * Applied once in the root build script (next to `shared.settings.native`). The consumer declares the plugins with
  * versions in its root `plugins {}` block (`apply false`): kotlin multiplatform + serialization, dokka, ksp, kotest, kover.
  *
  * Every subproject gets: multiplatform, serialization, dokka, ksp, kotest; commonMain kotlinx-serialization-json;
