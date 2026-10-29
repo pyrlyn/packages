@@ -28,5 +28,6 @@ Targets: JVM, macOS arm64, Linux x64 and arm64, Windows x64.
 
 ## Build
 
-`./gradlew check` runs the tests, ktlint and detekt. The lint settings come from a checkout of
-ci-diffuser at `../../apps/ci-diffuser`, or `CI_DIFFUSER_DIR`.
+`./gradlew check` runs the tests, ktlint and detekt. The lint settings come from
+`shared-settings` in the workspace's `packages/` (found in any directory above the build), or
+`SHARED_SETTINGS_DIR`.
