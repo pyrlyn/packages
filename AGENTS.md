@@ -23,8 +23,8 @@ repository for the kotlinx-rpc modules (see `settings.gradle.kts`).
 
 ## Build and test
 
-Needs JDK 21 and checkouts of `ci-diffuser` (`../../apps/ci-diffuser`, or `CI_DIFFUSER_DIR`) and
-`kotlin-kit` (`../kotlin-kit`, or `KOTLIN_KIT_DIR`).
+Needs JDK 21 and `shared-settings` and `kotlin-kit` in the workspace's `packages/` (found in any
+directory above the build, so a nested worktree works; or `SHARED_SETTINGS_DIR`, `KOTLIN_KIT_DIR`).
 
 ```bash
 ./gradlew check        # tests on the host's native target, ktlint, detekt

@@ -19,5 +19,13 @@ client.enable(store)
 val report = client.sync(store)
 ```
 
-Include it as a Gradle build: `includeBuild("../../packages/kotlin-sync")`, then depend on
-`pyrlyn.sync:client`.
+Include it as a Gradle build, then depend on `pyrlyn.sync:client`. In `settings.gradle.kts`, find it
+with the `sharedBuild` helper from `packages/shared-settings/README.md`:
+
+```kotlin
+pluginManagement {
+    extra["kotlinSyncDir"] = sharedBuild("kotlin-sync", "KOTLIN_SYNC_DIR")
+}
+
+includeBuild(extra["kotlinSyncDir"] as String)
+```
