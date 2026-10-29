@@ -30,8 +30,12 @@ formats the same way.
 ## Use
 
 ```kotlin
-// settings.gradle.kts
-includeBuild(System.getenv("KOTLIN_KIT_DIR") ?: "../../packages/kotlin-kit")
+// settings.gradle.kts: `sharedBuild` is the helper from packages/shared-settings/README.md
+pluginManagement {
+    extra["kotlinKitDir"] = sharedBuild("kotlin-kit", "KOTLIN_KIT_DIR")
+}
+
+includeBuild(extra["kotlinKitDir"] as String)
 
 // build.gradle.kts
 dependencies { implementation("pyrlyn.kit:toml-aot") }
@@ -43,8 +47,8 @@ before the Kotlin runtime can overwrite it.
 
 ## Build
 
-`./gradlew check` runs the tests, ktlint and detekt. The lint settings come from a checkout of
-ci-diffuser at `../../apps/ci-diffuser`, or `CI_DIFFUSER_DIR`.
+`./gradlew check` runs the tests, ktlint and detekt. The lint settings come from
+`shared-settings` in the workspace's `packages/` (found in any directory above the build, or `SHARED_SETTINGS_DIR`).
 
 `:archive` and `:db-native` need `conan` on `PATH`: their builds run `conan install` against the module's
 `conan.lock` with the profiles in `conan/` (`gradle/conan.gradle.kts`), into `<module>/build/conan/<target>`. macOS

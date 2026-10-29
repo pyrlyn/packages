@@ -9,7 +9,7 @@
 | CMake | system package | Conan's Windows builds of bzip2, xz_utils and sqlite3 | https://cmake.org |
 | Ninja | system package | CMake's generator for those builds on a Windows host, which has no make | https://github.com/ninja-build/ninja |
 | zlib | Kotlin/Native platform library (`platform.zlib`) | gzip, deflate and CRC-32 in `:archive` | https://zlib.net |
-| ci-diffuser | checkout at `../../apps/ci-diffuser` (or `CI_DIFFUSER_DIR`), local included build | Shared settings, ktlint and detekt | `apps/ci-diffuser` (no remote) |
+| shared-settings | `packages/shared-settings` above the build (or `SHARED_SETTINGS_DIR`), local included build | Shared settings, ktlint and detekt | `packages/shared-settings` (no remote) |
 
 ## Maven
 
