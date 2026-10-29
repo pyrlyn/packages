@@ -10,4 +10,4 @@ Reusable WebGL2 rendering for Kotlin/Wasm (Compose Multiplatform web).
 
 Use from another build: `includeBuild(System.getenv("KOTLIN_WEBGL_DIR") ?: "../../packages/kotlin-webgl")`.
 
-Check: `CI_DIFFUSER_DIR=… ./gradlew check`.
+Check: `./gradlew check`. The lint settings come from `shared-settings` in the workspace's `packages/` (found in any directory above the build), or `SHARED_SETTINGS_DIR`.
