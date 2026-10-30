@@ -6,6 +6,7 @@ checkout of this repository, found in a `packages/` directory above their own bu
 
 | Package | What it is |
 | --- | --- |
+| [kotlin-adwaita](kotlin-adwaita) | Adwaita-style UI components for Compose Multiplatform, without business logic |
 | [kotlin-fluent](kotlin-fluent) | Fluent UI components for Compose Multiplatform, without business logic |
 | [kotlin-glass](kotlin-glass) | Glass UI components for Compose Multiplatform, without business logic |
 | [kotlin-kit](kotlin-kit) | Small Kotlin/Native libraries: command lines, files, archives, TOML, YAML, semver, HTTP, SQLite, child processes |
