@@ -2,11 +2,11 @@
 @file:Suppress("MagicNumber")
 
 // What the window stands on: the wall, the glass over it, and the round icons. Compose has no live backdrop blur, so
-// the wall blurs itself and the glass is a translucent fill over it, which reads the same because the wall never moves.
+// the wall is blurred already and the glass is a translucent fill over it, which reads the same because the wall never
+// moves.
 
 package pyrlyn.adwaita
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -18,26 +18,36 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.BlurredEdgeTreatment
-import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.CacheDrawScope
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.draw.innerShadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.LinearGradientShader
 import androidx.compose.ui.graphics.Shader
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.toIntSize
+import androidx.compose.ui.unit.toSize
 import pyrlyn.glass.Glyph
 import pyrlyn.glass.GlyphIcon
 import kotlin.math.PI
@@ -100,44 +110,71 @@ private fun DrawScope.orb(
     )
 }
 
-/** The wall under the window, blurred as the design's window blurs the desktop behind it. Fills what it is given. */
+/**
+ * The wall under the window, blurred as the design's window blurs the desktop behind it. Fills what it is given.
+ *
+ * Blurred once for each size and only drawn after that: blurred on every frame, it costs more than all the rest of the
+ * window. Blurring a quarter of the size loses nothing the blur would have kept, and the result is kept at full size
+ * because drawing an image one to one costs far less than stretching it, which shows when there is no GPU.
+ */
 @Composable
 fun Wall(modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxSize().background(Color(0xFF171A35))) {
-        Canvas(Modifier.fillMaxSize().blur(36.dp, BlurredEdgeTreatment.Rectangle)) {
-            drawRect(WALL)
-            glow(Color(0xFF3A2A7A), Offset(0.15f, 0.1f), Size(1.2f, 0.9f), 0.55f)
-            glow(Color(0xFF0C6B62), Offset(0.9f, 0.85f), Size(0.9f, 0.8f), 0.6f)
-            val unit = size.minDimension
-            orb(
-                Offset(size.width * 0.86f, size.height * 0.2f),
-                unit * 0.2f,
-                Offset(0.32f, 0.28f),
-                0f to Color(0xFFFFD0C4),
-                0.28f to Color(0xFFFF7A6B),
-                0.62f to Color(0xFFB2345F),
-                1f to Color(0xFF3B1340),
-            )
-            orb(
-                Offset(size.width * 0.08f, size.height * 0.82f),
-                unit * 0.17f,
-                Offset(0.3f, 0.26f),
-                0f to Color(0xFFE2FFF6),
-                0.3f to Color(0xFF3DDCB0),
-                0.66f to Color(0xFF0F7F6C),
-                1f to Color(0xFF0A2F33),
-            )
-            orb(
-                Offset(size.width * 0.5f, size.height * 1.02f),
-                unit * 0.13f,
-                Offset(0.34f, 0.3f),
-                0f to Color(0xFFDCD4FF),
-                0.34f to Color(0xFF8D72FF),
-                0.7f to Color(0xFF3F2A9C),
-                1f to Color(0xFF1A1240),
-            )
-        }
-    }
+    val blur = 36.dp
+    Box(
+        modifier.fillMaxSize().drawWithCache {
+            val whole = size.toIntSize().atLeastOnePixel()
+            val small = (whole / WALL_SHRINK).atLeastOnePixel()
+            val radius = blur.toPx() / WALL_SHRINK
+            val layer = obtainGraphicsLayer().apply { renderEffect = BlurEffect(radius, radius, TileMode.Clamp) }
+            layer.record(size = small) { wall() }
+            val blurred = painted(small) { drawLayer(layer) }
+            val painted = painted(whole) { drawImage(blurred, dstSize = whole, filterQuality = FilterQuality.Low) }
+            onDrawBehind { drawImage(painted) }
+        },
+    )
+}
+
+private const val WALL_SHRINK = 4
+
+private fun IntSize.atLeastOnePixel() = IntSize(width.coerceAtLeast(1), height.coerceAtLeast(1))
+
+private fun CacheDrawScope.painted(
+    size: IntSize,
+    draw: DrawScope.() -> Unit,
+) = ImageBitmap(size.width, size.height).also { CanvasDrawScope().draw(this, layoutDirection, Canvas(it), size.toSize(), draw) }
+
+private fun DrawScope.wall() {
+    drawRect(WALL)
+    glow(Color(0xFF3A2A7A), Offset(0.15f, 0.1f), Size(1.2f, 0.9f), 0.55f)
+    glow(Color(0xFF0C6B62), Offset(0.9f, 0.85f), Size(0.9f, 0.8f), 0.6f)
+    val unit = size.minDimension
+    orb(
+        Offset(size.width * 0.86f, size.height * 0.2f),
+        unit * 0.2f,
+        Offset(0.32f, 0.28f),
+        0f to Color(0xFFFFD0C4),
+        0.28f to Color(0xFFFF7A6B),
+        0.62f to Color(0xFFB2345F),
+        1f to Color(0xFF3B1340),
+    )
+    orb(
+        Offset(size.width * 0.08f, size.height * 0.82f),
+        unit * 0.17f,
+        Offset(0.3f, 0.26f),
+        0f to Color(0xFFE2FFF6),
+        0.3f to Color(0xFF3DDCB0),
+        0.66f to Color(0xFF0F7F6C),
+        1f to Color(0xFF0A2F33),
+    )
+    orb(
+        Offset(size.width * 0.5f, size.height * 1.02f),
+        unit * 0.13f,
+        Offset(0.34f, 0.3f),
+        0f to Color(0xFFDCD4FF),
+        0.34f to Color(0xFF8D72FF),
+        0.7f to Color(0xFF3F2A9C),
+        1f to Color(0xFF1A1240),
+    )
 }
 
 /** The window's glass over the [Wall]. */
