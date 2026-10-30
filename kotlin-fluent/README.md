@@ -33,7 +33,7 @@ FluentTheme(FluentColors.Light) {
 | --- | --- |
 | `Colors.kt` | `FluentColors`, `WindowMaterial`, `Presets`, `FluentType`, `FluentTheme` |
 | `Surfaces.kt` | `Wall`, `WindowMaterialLayer`, `Modifier.card`, `Modifier.lift`, `AppIcon`, `FeatureIcon`, `BrandTile` |
-| `Controls.kt` | Buttons, `SearchBox`, `ToggleSwitch`, `ComboBox`, `FluentSlider`, `RadioButtons`, `Swatch`, `SelectorBar`, badges, `ReleaseTag`, `CommandField`, progress |
+| `Controls.kt` | Buttons, `SearchBox`, `ToggleSwitch`, `ComboBox`, `FluentSlider`, `RadioButtons`, `Swatch`, `SelectorBar`, badges, `ReleaseTag`, `CommandField`, `TerminalOutput`, progress |
 | `Layout.kt` | `TitleBar`, `CaptionButtons`, `NavItem`, `ContentLayer`, `PageHead`, `Breadcrumb` |
 | `Panels.kt` | `Panel`, `LiftPanel`, `ListRow`, `SettingsCard`, `Tile`, `FeatureCard`, `StatCard`, `ActivityFlyout`, `InfoBar`, `FactsList`, `LogRow`, `HeroPanel`, `HeroScene` |
 | `Dialog.kt` | `ContentDialog` |

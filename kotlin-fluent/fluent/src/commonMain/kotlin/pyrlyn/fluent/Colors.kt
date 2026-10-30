@@ -244,6 +244,7 @@ data class FluentColors(
         val OnCoral = Color(0xFF2A0A05)
         val TerminalFill = Color(0xFF0A1214)
         val TerminalInk = Color(0xFFE8F4F1)
+        val TerminalDim = Color(0xFF8FA8A3)
     }
 }
 
