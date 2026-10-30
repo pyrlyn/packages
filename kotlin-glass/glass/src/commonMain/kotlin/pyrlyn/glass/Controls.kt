@@ -92,7 +92,7 @@ private fun Modifier.fieldRing(source: MutableInteractionSource): Modifier {
 
 /** Whether [source] holds the focus by the keyboard: a click focuses a control too, and that earns it no ring. */
 @Composable
-internal fun keyboardFocus(source: MutableInteractionSource): Boolean {
+fun keyboardFocus(source: MutableInteractionSource): Boolean {
     val focused by source.collectIsFocusedAsState()
     var clicked by remember(source) { mutableStateOf(false) }
     LaunchedEffect(source) {
