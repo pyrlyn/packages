@@ -1,0 +1,17 @@
+# Overrides on top of the shared-settings and default detekt config.
+style:
+  MagicNumber:
+    excludes: ['**/*Test/**', '**/test/**']
+    # A named property already says what its number means.
+    ignorePropertyDeclaration: true
+
+complexity:
+  TooManyFunctions:
+    allowedFunctionsPerClass: 25
+    allowedFunctionsPerFile: 25
+    excludes: ['**/*Test/**', '**/test/**']
+
+naming:
+  FunctionNaming:
+    # Compose names its UI functions like types.
+    ignoreAnnotated: ['Composable']
