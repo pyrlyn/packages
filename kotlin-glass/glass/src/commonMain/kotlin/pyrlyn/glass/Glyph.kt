@@ -44,6 +44,7 @@ enum class Glyph(
     Palette(listOf("M12 22a10 10 0 1 1 10-10c0 2.5-2 3-3.5 3H16a2 2 0 0 0-1.5 3.3A2 2 0 0 1 12 22z", "M7.5 9.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2z", "M12 6a1 1 0 1 0 0 2 1 1 0 0 0 0-2z", "M16.5 9.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2z")),
     Waves(listOf("M3 17c3-4 6-4 9 0s6 4 9 0", "M3 11c3-4 6-4 9 0s6 4 9 0")),
     Info(listOf("M12 8h.01", "M12 11v5")),
+    Menu(listOf("M4 7h16M4 12h16M4 17h16")),
 }
 
 private const val CIRCLE_9 = "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z"
