@@ -106,10 +106,10 @@ fun CaptionButtons(
     onToggleMaximize: () -> Unit,
     onClose: () -> Unit,
 ) {
-    CaptionButton("Minimize", onClick = onMinimize) { ink ->
+    CaptionButton("Minimize", WindowZone.Minimize, onClick = onMinimize) { ink ->
         drawLine(ink, Offset(0f, size.height / 2), Offset(size.width, size.height / 2), 1.dp.toPx())
     }
-    CaptionButton(if (maximized) "Restore" else "Maximize", onClick = onToggleMaximize) { ink ->
+    CaptionButton(if (maximized) "Restore" else "Maximize", WindowZone.Maximize, onClick = onToggleMaximize) { ink ->
         val line = Stroke(1.dp.toPx())
         if (maximized) {
             val shift = 2.dp.toPx()
@@ -126,7 +126,7 @@ fun CaptionButtons(
             drawRoundRect(ink, style = line, cornerRadius = CornerRadius(1.5.dp.toPx()))
         }
     }
-    CaptionButton("Close", close = true, onClick = onClose) { ink ->
+    CaptionButton("Close", WindowZone.Close, close = true, onClick = onClose) { ink ->
         drawLine(ink, Offset.Zero, Offset(size.width, size.height), 1.dp.toPx())
         drawLine(ink, Offset(size.width, 0f), Offset(0f, size.height), 1.dp.toPx())
     }
@@ -135,13 +135,15 @@ fun CaptionButtons(
 @Composable
 private fun CaptionButton(
     label: String,
+    zone: WindowZone,
     close: Boolean = false,
     onClick: () -> Unit,
     draw: DrawScope.(Color) -> Unit,
 ) {
     val c = LocalFluent.current
     val source = remember { MutableInteractionSource() }
-    val hovered by source.collectIsHoveredAsState()
+    val pointerOver by source.collectIsHoveredAsState()
+    val hovered = pointerOver || LocalWindowZones.current?.hovered == zone
     val fill =
         when {
             hovered && close -> FluentColors.DangerFill
@@ -151,6 +153,7 @@ private fun CaptionButton(
     val ink = if (hovered && close) Color.White else c.ink
     Box(
         Modifier
+            .windowZone(zone, onClick)
             .width(46.dp)
             .fillMaxHeight()
             .background(fill)

@@ -7,6 +7,7 @@ import kotlinx.io.Buffer
 import kotlinx.io.IOException
 import kotlinx.io.RawSource
 import kotlinx.io.files.Path
+import kotlinx.io.readTo
 import kotlin.math.min
 
 /** One member of a zip, from its central directory record. */
@@ -188,7 +189,7 @@ private class CrcSource(
             return -1
         }
         val bytes = ByteArray(n.toInt())
-        scratch.readAtMostTo(bytes, 0, bytes.size)
+        scratch.readTo(bytes)
         crc = crc32(bytes, crc = crc)
         sink.write(bytes)
         return n

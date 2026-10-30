@@ -1,6 +1,6 @@
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 
-// Fluent components in commonMain only: a platform needs no code of its own to use them.
+// Fluent components in commonMain: a platform needs no code of its own to use them. jvmMain only adds Windows 11's frame.
 plugins {
     id("org.jetbrains.compose")
     kotlin("plugin.compose")
@@ -14,6 +14,9 @@ configure<KotlinMultiplatformExtension> {
             api(compose.ui)
             api(compose.material3)
             api("pyrlyn.glass:glass")
+        }
+        jvmMain.dependencies {
+            implementation("net.java.dev.jna:jna:5.19.1")
         }
         jvmTest.dependencies {
             implementation(compose.desktop.currentOs)

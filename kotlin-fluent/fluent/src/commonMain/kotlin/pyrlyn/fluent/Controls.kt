@@ -48,6 +48,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -73,9 +74,12 @@ import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
@@ -649,6 +653,45 @@ fun CommandField(
         Text(command, color = FluentColors.TerminalInk, style = type.code, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         FluentIconButton(Glyph.Copy, copyLabel, tint = FluentColors.TerminalInk, hover = Color.White.copy(alpha = 0.1f), onClick = onCopy)
     }
+}
+
+/** One line a command printed: a dim [label], then [value], in the prompt's green when it went [good]. */
+@Immutable
+class TerminalLine(
+    val label: String,
+    val value: String,
+    val good: Boolean = false,
+)
+
+/** A command and what it printed, on a terminal's fill. */
+@Composable
+fun TerminalOutput(
+    command: String,
+    lines: List<TerminalLine>,
+    modifier: Modifier = Modifier,
+) {
+    val type = LocalFluentType.current
+    val width = lines.maxOfOrNull { it.label.length } ?: 0
+    val text =
+        buildAnnotatedString {
+            withStyle(SpanStyle(FluentColors.Mint)) { append("> ") }
+            append(command)
+            for (line in lines) {
+                append('\n')
+                withStyle(SpanStyle(FluentColors.TerminalDim)) { append(line.label.padEnd(width + 1)) }
+                if (line.good) withStyle(SpanStyle(FluentColors.Mint)) { append(line.value) } else append(line.value)
+            }
+        }
+    Text(
+        text,
+        modifier
+            .clip(Corners.Control)
+            .background(FluentColors.TerminalFill)
+            .border(1.dp, Color.White.copy(alpha = 0.1f), Corners.Control)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        color = FluentColors.TerminalInk,
+        style = type.code,
+    )
 }
 
 /** A determinate bar: a hairline track under a 3-pixel fill. */

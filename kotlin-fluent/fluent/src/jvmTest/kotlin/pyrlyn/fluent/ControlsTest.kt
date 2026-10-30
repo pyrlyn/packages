@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -52,6 +53,13 @@ class ControlsTest {
             waitForIdle()
             onNodeWithTag("go").assertIsNotEnabled().performClick()
             assertEquals(1, clicks)
+        }
+
+    @Test
+    fun aTerminalBlockShowsTheCommandAndAlignsItsLines() =
+        runComposeUiTest {
+            setContent { Themed { TerminalOutput("ketch why rg", listOf(TerminalLine("asset", "rg.zip"), TerminalLine("sha256", "ok", good = true)), Modifier.testTag("out")) } }
+            onNodeWithTag("out").assertTextEquals("> ketch why rg\nasset  rg.zip\nsha256 ok")
         }
 
     @Test
@@ -175,6 +183,23 @@ class ControlsTest {
             onNodeWithContentDescription("Minimize").assertExists()
             onNodeWithContentDescription("Close").performClick()
             assertTrue(closed)
+        }
+
+    @Test
+    fun theFrameClicksACaptionButtonThatTheContentNeverSaw() =
+        runComposeUiTest {
+            val zones = WindowZones()
+            var maximized by mutableStateOf(false)
+            setContent {
+                CompositionLocalProvider(LocalWindowZones provides zones) {
+                    Themed { Row { CaptionButtons(maximized, {}, { maximized = !maximized }, {}) } }
+                }
+            }
+            waitForIdle()
+            zones.press(WindowZone.Maximize)
+            zones.release(WindowZone.Maximize)
+            waitForIdle()
+            onNodeWithContentDescription("Restore").assertExists()
         }
 
     @Test

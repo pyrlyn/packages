@@ -1,6 +1,7 @@
 package archive
 
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
@@ -106,6 +107,21 @@ class ZipTest {
 
     @Test
     fun aNameWithoutTheUtf8FlagIsCp437() = assertEquals("Ç╬ a", cp437(byteArrayOf(0x80.toByte(), 0xCE.toByte(), 0x20, 0x61)))
+
+    @Test
+    fun aMemberLargerThanOneBufferSegmentSurvivesALargeRead() {
+        // Past kotlinx.io's 8 KiB segment: the copy of a large read has to cross from one segment to the next.
+        val body = ByteArray(100_000) { (it * 31 % 251).toByte() }
+        val bytes =
+            ZipWriter()
+                .apply {
+                    file("deflated", body)
+                    file("stored", body, deflated = false)
+                }.finish()
+        zip(bytes) { z ->
+            for (entry in z.entries) assertContentEquals(body, readAll(z.open(entry), chunk = 64 * 1024L), entry.name)
+        }
+    }
 
     private fun centralAt(bytes: ByteArray): Int = (0 until bytes.size - 4).first { bytes.u32(it) == CENTRAL_SIG }
 }
