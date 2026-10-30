@@ -6,6 +6,7 @@ checkout of this repository, found in a `packages/` directory above their own bu
 
 | Package | What it is |
 | --- | --- |
+| [kotlin-glass](kotlin-glass) | Glass UI components for Compose Multiplatform, without business logic |
 | [kotlin-kit](kotlin-kit) | Small Kotlin/Native libraries: command lines, files, archives, TOML, YAML, semver, HTTP, SQLite, child processes |
 | [kotlin-snapshot](kotlin-snapshot) | Snapshot assertions for Kotlin Multiplatform |
 | [kotlin-sync](kotlin-sync) | Sync contracts and the Kotlin client for the cloud sync |
