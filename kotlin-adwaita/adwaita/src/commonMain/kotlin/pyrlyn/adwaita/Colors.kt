@@ -14,6 +14,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -62,6 +63,7 @@ data class AdwaitaColors(
 data class AdwaitaFonts(
     val text: FontFamily = FontFamily.Default,
     val mono: FontFamily = FontFamily.Monospace,
+    val platform: PlatformTextStyle? = null,
 )
 
 /** The type ramp. */
@@ -69,23 +71,26 @@ data class AdwaitaFonts(
 class AdwaitaType(
     fonts: AdwaitaFonts,
 ) {
-    val title1 = TextStyle(fontFamily = fonts.text, fontSize = 36.sp, lineHeight = 40.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.02).em)
-    val page = TextStyle(fontFamily = fonts.text, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.02).em)
-    val title2 = TextStyle(fontFamily = fonts.text, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-    val title3 = TextStyle(fontFamily = fonts.text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-    val section = TextStyle(fontFamily = fonts.text, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-    val heading = TextStyle(fontFamily = fonts.text, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-    val lead = TextStyle(fontFamily = fonts.text, fontSize = 15.sp, lineHeight = 23.sp)
-    val body = TextStyle(fontFamily = fonts.text, fontSize = 14.sp, lineHeight = 21.sp)
-    val bodyStrong = TextStyle(fontFamily = fonts.text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-    val caption = TextStyle(fontFamily = fonts.text, fontSize = 13.sp, lineHeight = 18.sp)
-    val captionStrong = TextStyle(fontFamily = fonts.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-    val small = TextStyle(fontFamily = fonts.text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-    val eyebrow = TextStyle(fontFamily = fonts.text, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.08.em)
-    val badge = TextStyle(fontFamily = fonts.text, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-    val mono = TextStyle(fontFamily = fonts.mono, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-    val monoSmall = TextStyle(fontFamily = fonts.mono, fontSize = 12.sp)
-    val terminal = TextStyle(fontFamily = fonts.mono, fontSize = 13.sp, lineHeight = 23.sp, fontWeight = FontWeight.Medium)
+    private val sans = TextStyle(fontFamily = fonts.text, platformStyle = fonts.platform)
+    private val fixed = TextStyle(fontFamily = fonts.mono, platformStyle = fonts.platform)
+
+    val title1 = sans.copy(fontSize = 36.sp, lineHeight = 40.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.02).em)
+    val page = sans.copy(fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.02).em)
+    val title2 = sans.copy(fontSize = 28.sp, fontWeight = FontWeight.Bold)
+    val title3 = sans.copy(fontSize = 20.sp, fontWeight = FontWeight.Bold)
+    val section = sans.copy(fontSize = 17.sp, fontWeight = FontWeight.Bold)
+    val heading = sans.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold)
+    val lead = sans.copy(fontSize = 15.sp, lineHeight = 23.sp)
+    val body = sans.copy(fontSize = 14.sp, lineHeight = 21.sp)
+    val bodyStrong = sans.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+    val caption = sans.copy(fontSize = 13.sp, lineHeight = 18.sp)
+    val captionStrong = sans.copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+    val small = sans.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+    val eyebrow = sans.copy(fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.08.em)
+    val badge = sans.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold)
+    val mono = fixed.copy(fontSize = 13.sp, fontWeight = FontWeight.Medium)
+    val monoSmall = fixed.copy(fontSize = 12.sp)
+    val terminal = fixed.copy(fontSize = 13.sp, lineHeight = 23.sp, fontWeight = FontWeight.Medium)
 }
 
 val LocalAdwaita = staticCompositionLocalOf<AdwaitaColors> { error("AdwaitaTheme is not applied") }
@@ -113,12 +118,12 @@ fun AdwaitaTheme(
     val base = MaterialTheme.typography
     val typography =
         Typography(
-            titleMedium = base.titleMedium.copy(fontFamily = fonts.text),
-            titleSmall = base.titleSmall.copy(fontFamily = fonts.text),
-            bodyLarge = base.bodyLarge.copy(fontFamily = fonts.text),
-            bodyMedium = base.bodyMedium.copy(fontFamily = fonts.text),
-            bodySmall = base.bodySmall.copy(fontFamily = fonts.text),
-            labelLarge = base.labelLarge.copy(fontFamily = fonts.text),
+            titleMedium = base.titleMedium.copy(fontFamily = fonts.text, platformStyle = fonts.platform),
+            titleSmall = base.titleSmall.copy(fontFamily = fonts.text, platformStyle = fonts.platform),
+            bodyLarge = base.bodyLarge.copy(fontFamily = fonts.text, platformStyle = fonts.platform),
+            bodyMedium = base.bodyMedium.copy(fontFamily = fonts.text, platformStyle = fonts.platform),
+            bodySmall = base.bodySmall.copy(fontFamily = fonts.text, platformStyle = fonts.platform),
+            labelLarge = base.labelLarge.copy(fontFamily = fonts.text, platformStyle = fonts.platform),
         )
     CompositionLocalProvider(LocalAdwaita provides colors, LocalAdwaitaType provides type) {
         MaterialTheme(colorScheme = scheme, typography = typography, shapes = MaterialTheme.shapes, content = content)

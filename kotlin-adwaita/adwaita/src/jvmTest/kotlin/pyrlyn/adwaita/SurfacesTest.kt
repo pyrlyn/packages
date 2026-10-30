@@ -8,6 +8,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.v2.runComposeUiTest
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.unit.dp
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -31,4 +32,12 @@ class SurfacesTest {
             setContent { Wall(Modifier.size(0.dp).testTag("wall")) }
             onNodeWithTag("wall").assertExists()
         }
+
+    @Test
+    fun theFontsPlatformStyleReachesTheTextAndTheMonospacedFaces() {
+        val platform = PlatformTextStyle(null, null)
+        val type = AdwaitaType(AdwaitaFonts(platform = platform))
+        assertEquals(platform, type.body.platformStyle)
+        assertEquals(platform, type.terminal.platformStyle)
+    }
 }
