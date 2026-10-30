@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -77,12 +78,16 @@ private val PETALS =
         Petal(520f, -140f, 520f, 62f, 0.32f),
     )
 
-/** The wall the window's material sits on. */
+/** Whether the desktop itself shows through the window, under a material of the system's. */
+val LocalWindowBackdrop = staticCompositionLocalOf { false }
+
+/** The wall the window's material sits on, where the desktop does not show through. */
 @Composable
 fun Wall(
     modifier: Modifier = Modifier,
     petals: List<Petal> = PETALS,
 ) {
+    if (LocalWindowBackdrop.current) return
     val colors = LocalFluent.current
     Canvas(modifier.fillMaxSize()) {
         drawRect(colors.wallBase)
@@ -136,7 +141,9 @@ private fun DrawScope.drawPetal(
 @Composable
 fun WindowMaterialLayer(modifier: Modifier = Modifier) {
     val colors = LocalFluent.current
-    Box(modifier.fillMaxSize().background(colors.window).background(colors.washLayer))
+    // The system's Mica and Acrylic are the fill; Transparent is ours, as the system has nothing that thin.
+    val fill = if (LocalWindowBackdrop.current && colors.material != WindowMaterial.Transparent) Color.Transparent else colors.window
+    Box(modifier.fillMaxSize().background(fill).background(colors.washLayer))
 }
 
 /** A card: the fill, the 1-pixel stroke, the lit top edge and a small shadow; [flat] drops the shadow, as list rows do. */
