@@ -1,11 +1,13 @@
-# File modification times. `struct stat` names the field `st_mtimespec` on macOS and `st_mtim` on Linux, and Kotlin
-# code shared by both sees only what the two have in common, so the field is read here in C.
+# File modification times, and flock. `struct stat` names the field `st_mtimespec` on macOS and `st_mtim` on Linux, and Kotlin
+# code shared by both sees only what the two have in common, so the field is read here in C. Kotlin/Native on Linux
+# does not expose flock(2) at all, because `struct flock` hides the function's name there.
 headerFilter = kit-none
 package = fs.mtime
 
 ---
 #include <errno.h>
 #include <fcntl.h>
+#include <sys/file.h>
 #include <sys/stat.h>
 #include <time.h>
 
@@ -44,4 +46,12 @@ static inline int kit_set_times(const char *path, long long seconds) {
     times[0].tv_nsec = 0;
     times[1] = times[0];
     return utimensat(AT_FDCWD, path, times, 0) == 0 ? 0 : errno;
+}
+
+/* An exclusive lock on `fd` without waiting: 0 when taken, else the errno (EWOULDBLOCK when another holder has it). */
+static inline int kit_flock_try(int fd) {
+    while (flock(fd, LOCK_EX | LOCK_NB) != 0) {
+        if (errno != EINTR) return errno;
+    }
+    return 0;
 }

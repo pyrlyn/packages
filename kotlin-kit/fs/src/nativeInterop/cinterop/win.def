@@ -84,3 +84,8 @@ static inline BOOL kit_GetFileTime(HANDLE h, LPFILETIME modified) { KIT_KEEP(Get
 static inline BOOL kit_SetFileTime(HANDLE h, const FILETIME* accessed, const FILETIME* modified) {
     KIT_KEEP(SetFileTime(h, NULL, accessed, modified));
 }
+// Locks the whole file, as flock does: both halves of the 64-bit length are the maximum.
+static inline BOOL kit_LockFileEx(HANDLE h, DWORD flags) {
+    OVERLAPPED over = {0};
+    KIT_KEEP(LockFileEx(h, flags, 0, MAXDWORD, MAXDWORD, &over));
+}

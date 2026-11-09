@@ -234,7 +234,7 @@ private fun succeeded(rc: Int): Boolean {
 }
 
 /** A system call again while a signal interrupts it. */
-private inline fun retry(call: () -> Int): Int {
+internal inline fun retry(call: () -> Int): Int {
     var r = call()
     while (r < 0 && errno == EINTR) r = call()
     return r

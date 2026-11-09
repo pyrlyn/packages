@@ -12,6 +12,7 @@ checkout of this repository, found in a `packages/` directory above their own bu
 | [kotlin-kit](kotlin-kit) | Small Kotlin/Native libraries: command lines, files, archives, TOML, YAML, semver, HTTP, SQLite, child processes |
 | [kotlin-snapshot](kotlin-snapshot) | Snapshot assertions for Kotlin Multiplatform |
 | [kotlin-sync](kotlin-sync) | Sync contracts and the Kotlin client for the cloud sync |
+| [kotlin-taskboard](kotlin-taskboard) | The task board engine: model, store SPI and a board with an API for parallel clients that never conflict |
 | [kotlin-wasm](kotlin-wasm) | An engine-neutral WebAssembly host interface with a Chasm adapter |
 | [kotlin-webgl](kotlin-webgl) | Reusable WebGL2 rendering for Kotlin/Wasm |
 | [shared-settings](shared-settings) | Shared Gradle build settings: ktlint, detekt, Kotlin/Native, repositories, build cache |
