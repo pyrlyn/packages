@@ -4,8 +4,20 @@ style:
     excludes: ['**/commonTest/**', '**/nativeTest/**', '**/unixTest/**', '**/mingwTest/**', '**/jvmTest/**', '**/test/**']
     # A named property already says what its number means.
     ignorePropertyDeclaration: true
+  # Guard clauses read better than one nested exit, and each throw names a distinct invalid-input rule.
+  ReturnCount:
+    max: 4
+  ThrowsCount:
+    max: 4
 
 complexity:
+  # The engine's op handlers branch on many independent rules; splitting them further would scatter one rule over several files.
+  CyclomaticComplexMethod:
+    allowedComplexity: 20
+  ComplexCondition:
+    allowedConditions: 5
   TooManyFunctions:
     allowedFunctionsPerClass: 25
     allowedFunctionsPerFile: 25
+    # Codec is one object so every wire shape lives in one place.
+    allowedFunctionsPerObject: 40
