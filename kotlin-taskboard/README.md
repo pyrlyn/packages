@@ -43,6 +43,20 @@ val page = board.changes(since = 0)                                             
 A `Store` only reads, locks and writes; the engine owns every rule. `MemoryStore` in `:testing` is a real in-memory
 store (its lock is a real mutex, so threads race for real) and `Race.run` starts N clients at once.
 
+### State blobs
+
+The engine keeps its state in blobs a store holds by name (`StateNames`). A host may read them, and may seed `ids`
+through `store.locked { it.commit(Commit(state = mapOf(StateNames.IDS to text))) }`.
+
+- **`ids`**: the last number handed out per parent, `{"": 41, "R12": 3}` (`""` is the top level, counted across every
+  prefix). A new id is one past the larger of the counter and the highest number on the board, so the counter only
+  remembers ids of deleted tasks. A host moving a board from another numbering seeds it once, before the first create,
+  and only when `state("ids")` is null.
+- **`leases`**, **`keys`**, **`index`**, **`journal`**: the engine's own; their formats may change between versions.
+
+A blob that does not parse is reported (through `BoardOptions.warn` and the call's warnings) and rebuilt on the next
+write.
+
 ## `:files`: a board in a folder
 
 `FileStore(dir)` keeps a board as Markdown files, in the layout rtok's board writes, so `Boards.open(FileStore(dir),

@@ -80,7 +80,7 @@ internal object State {
 
     fun encodeLeases(leases: Map<TaskId, Lease>): String = JsonObject(leases.entries.sortedBy { it.key }.associate { (id, l) -> id.toString() to Codec.leaseToJson(l) }).toString()
 
-    /** Next number handed out per parent (`""` for top level). */
+    /** Last number handed out per parent (`""` for top level). */
     fun decodeCounters(text: String?): MutableMap<String, Long> = decodeMap(StateNames.IDS, text) { k, v -> k to ((v as? JsonPrimitive)?.longOrNull ?: corrupt(StateNames.IDS)) }
 
     fun encodeCounters(counters: Map<String, Long>): String = JsonObject(counters.entries.sortedBy { it.key }.associate { it.key to JsonPrimitive(it.value) }).toString()
