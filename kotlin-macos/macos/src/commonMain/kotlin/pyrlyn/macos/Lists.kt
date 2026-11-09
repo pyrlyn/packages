@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -37,7 +39,11 @@ fun SectionLabel(
     }
 }
 
-/** A sidebar item: a status dot, a title and the line under it. The dot's [tone] says the state; [subtitle] says it in words. */
+/**
+ * A sidebar item: a status dot, a title and the line under it. The dot's [tone] says the state; [subtitle] says it in words.
+ * [meta] is a short note at the end of the title line, such as how long ago the item last changed.
+ * With an [icon], the item leads with it and the dot becomes a badge on its bottom-right corner.
+ */
 @Composable
 fun SidebarRow(
     title: String,
@@ -46,15 +52,47 @@ fun SidebarRow(
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    meta: String? = null,
+    icon: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     SelectableRow(selected, onClick, modifier, RoundedCornerShape(MacRadius.sm), MacSpace.sm) {
-        StatusDot(tone)
+        if (icon == null) StatusDot(tone) else BadgedIcon(icon, tone)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(MacSpace.xxs)) {
-            Label(title, color = Mac.colors.textPrimary, style = if (selected) Mac.type.bodyEmphasized else Mac.type.body, maxLines = 1)
+            Row(horizontalArrangement = Arrangement.spacedBy(MacSpace.sm)) {
+                Label(
+                    title,
+                    Modifier.weight(1f).alignByBaseline(),
+                    Mac.colors.textPrimary,
+                    if (selected) Mac.type.bodyEmphasized else Mac.type.body,
+                    maxLines = 1,
+                )
+                meta?.let { Label(it, Modifier.alignByBaseline(), Mac.colors.textSecondary, Mac.type.caption, maxLines = 1) }
+            }
             Label(subtitle, color = Mac.colors.textSecondary, style = Mac.type.caption, maxLines = 1)
         }
         trailing?.invoke()
+    }
+}
+
+/**
+ * The badge hangs past the icon's corner, ringed in the sidebar's colour, so it reads as a mark
+ * on the icon rather than part of its art.
+ */
+@Composable
+private fun BadgedIcon(
+    icon: @Composable () -> Unit,
+    tone: Tone,
+) {
+    Box {
+        icon()
+        Box(
+            Modifier
+                .align(Alignment.BottomEnd)
+                .offset(BADGE_OVERHANG, BADGE_OVERHANG)
+                .background(Mac.colors.bgChrome, CircleShape)
+                .padding(BADGE_RING),
+        ) { StatusDot(tone) }
     }
 }
 
@@ -195,3 +233,5 @@ fun Modifier.topHairline(color: Color): Modifier =
     }
 
 private val STATUS_DOT = 7.dp
+private val BADGE_RING = 1.5.dp
+private val BADGE_OVERHANG = 2.dp
