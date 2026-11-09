@@ -1,6 +1,6 @@
 package pyrlyn.taskboard.files
 
-import fs.bytesIfExists
+import fs.linkSize
 import pyrlyn.taskboard.BoardError
 import pyrlyn.taskboard.BoardException
 import pyrlyn.taskboard.Commit
@@ -65,8 +65,10 @@ private fun stateEffects(
             if (lines.any { '\n' in it }) invalid("a line appended to $name contains a newline")
             val rel = board.statePath(name)
             // An appended blob starts from what the commit's own `state` leaves, so the replay point is exact.
-            val from = if (name in commit.state) commit.state[name]?.encodeToByteArray()?.size ?: 0 else bytesIfExists(board.pathOf(rel))?.size ?: 0
+            val from = if (name in commit.state) byteLength(commit.state[name]) else linkSize(board.pathOf(rel)) ?: 0L
             Effect.Append(rel, from, lines)
         }
     return blobs + appends
 }
+
+private fun byteLength(text: String?): Long = text?.encodeToByteArray()?.size?.toLong() ?: 0L

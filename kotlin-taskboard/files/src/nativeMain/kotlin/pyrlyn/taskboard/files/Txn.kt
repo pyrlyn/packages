@@ -2,7 +2,9 @@ package pyrlyn.taskboard.files
 
 import fs.FsException
 import fs.WriteOptions
+import fs.appendSink
 import fs.bytesIfExists
+import fs.linkSize
 import fs.removeFile
 import fs.syncDir
 import kotlinx.serialization.json.Json
@@ -11,10 +13,10 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
 import kotlinx.serialization.json.put
 import pyrlyn.taskboard.BoardError
 import pyrlyn.taskboard.BoardException
@@ -40,7 +42,7 @@ internal sealed interface Effect {
      */
     data class Append(
         override val path: String,
-        val from: Int,
+        val from: Long,
         val lines: List<String>,
     ) : Effect
 }
@@ -104,7 +106,7 @@ internal class Txn(
             return when (val op = o.getValue("op").jsonPrimitive.contentOrNull) {
                 "write" -> Effect.Write(path, o.getValue("text").jsonPrimitive.content)
                 "unlink" -> Effect.Unlink(path)
-                "append" -> Effect.Append(path, o.getValue("from").jsonPrimitive.int, o.getValue("lines").jsonArray.map { it.jsonPrimitive.content })
+                "append" -> Effect.Append(path, o.getValue("from").jsonPrimitive.long, o.getValue("lines").jsonArray.map { it.jsonPrimitive.content })
                 else -> throw FormatException("unknown step \"$op\"")
             }
         }
@@ -179,9 +181,16 @@ internal class TxnLog(
             }
 
             is Effect.Append -> {
-                val kept = (bytesIfExists(path) ?: ByteArray(0)).let { it.copyOf(minOf(it.size, effect.from)) }
                 val added = effect.lines.joinToString("") { it + "\n" }.encodeToByteArray()
-                WriteOptions(createParent = true).write(path, kept + added)
+                // The journal grows on every write, so the usual case adds to the end; only a replay that finds lines
+                // past `from` (a crash after the append) pays for rewriting the whole file. Unlike the atomic writes, the
+                // added lines are not fsynced: a power loss may drop the journal's tail, never a task.
+                if ((linkSize(path) ?: 0L) == effect.from) {
+                    appendSink(path).use { it.write(added) }
+                } else {
+                    val kept = (bytesIfExists(path) ?: ByteArray(0)).let { it.copyOf(minOf(it.size.toLong(), effect.from).toInt()) }
+                    WriteOptions(createParent = true).write(path, kept + added)
+                }
             }
         }
     }

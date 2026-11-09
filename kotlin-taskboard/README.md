@@ -77,7 +77,8 @@ options)` reads and replaces it. Native targets only (it needs kotlin-kit's `fs`
 - **A commit is all or nothing, across a crash.** It plans every file it will write or remove, writes the plan to
   `.state/txn.json` (fsynced), applies it (task files, then removals, then state blobs, then appended journal lines)
   and deletes the plan. If the process dies in between, the next lock holder replays the plan first; every step can be
-  repeated, and an append counts from the length the blob had, so nothing is added twice. A reader that takes no lock can
+  repeated, and an append counts from the length the blob had, so nothing is added twice. Journal lines are added to the
+  end of the file without an fsync, so a power loss (not a process crash) may drop the journal's tail but never a task. A reader that takes no lock can
   still see a commit half applied (files are replaced one by one, each atomically, never half written). A commit never
   overwrites or removes a file it could not read: it fails with `invalid` and names the file. A plan that does not
   parse or names a file outside the board is not replayed; the write fails with `invalid` and leaves it for you to check.
