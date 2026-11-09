@@ -92,4 +92,10 @@ class BatchTest {
         assertEquals("ok", t.report)
         assertNull(board.show(a).lease)
     }
+
+    @Test
+    fun aFailingStepIsReportedOnTheWireWithItsIndex() {
+        val e = fail { board.batch(listOf(Op.Create(NewTask("ok")), Op.Update(id("T9"), Patch(title = "x")))) }
+        assertEquals("""{"code":"not_found","message":"no task T9","data":{"what":"T9","op":1}}""", Codec.errorToJson(e).toString())
+    }
 }

@@ -231,9 +231,12 @@ object Codec {
             replayed = o.optBool("replayed") ?: false,
         )
 
-    fun errorToJson(
+    /** The wire error: the failing op of a batch rides along as `data.op`. */
+    fun errorToJson(e: BoardException): JsonObject = errorToJson(e.error, e.opIndex)
+
+    private fun errorToJson(
         e: BoardError,
-        opIndex: Int? = null,
+        opIndex: Int?,
     ): JsonObject =
         buildJsonObject {
             put("code", e.code)

@@ -17,7 +17,9 @@ class Fixture(
     journalKeep: Int = 10_000,
     keyTtl: Duration = 24.hours,
 ) {
-    val board: Board = Boards.open(store, BoardOptions(clock = clock, idPrefix = "T", lease = lease, liveness = liveness, journalKeep = journalKeep, keyTtl = keyTtl))
+    /** Everything the board passed to `BoardOptions.warn`. */
+    val warnings = mutableListOf<String>()
+    val board: Board = Boards.open(store, BoardOptions(clock = clock, idPrefix = "T", lease = lease, liveness = liveness, journalKeep = journalKeep, keyTtl = keyTtl, warn = { warnings += it }))
 
     fun create(
         title: String = "task",

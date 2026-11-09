@@ -114,6 +114,22 @@ class MemoryStore(
         }
     }
 
+    /** Overwrites a state blob with [text], as a damaged file would be. */
+    fun corruptState(
+        name: String,
+        text: String,
+    ) {
+        runBlocking { mutex.lock() }
+        try {
+            data = Data(data.tasks, data.state + (name to text))
+        } finally {
+            mutex.unlock()
+        }
+    }
+
+    /** The raw text of a state blob. */
+    fun stateText(name: String): String? = data.state[name]
+
     fun handRemove(id: TaskId) {
         runBlocking { mutex.lock() }
         try {

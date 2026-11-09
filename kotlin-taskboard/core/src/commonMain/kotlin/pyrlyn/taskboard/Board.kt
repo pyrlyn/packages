@@ -97,6 +97,8 @@ data class BoardOptions(
     val journalKeep: Int = 10_000,
     /** How long an idempotency key remembers its result. */
     val keyTtl: Duration = 24.hours,
+    /** Told about anything the board recovered from or ignored, such as a failing liveness hook or an unreadable state file. */
+    val warn: (String) -> Unit = {},
 ) {
     init {
         TaskId.top(idPrefix, 1u)

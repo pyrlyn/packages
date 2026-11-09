@@ -41,6 +41,20 @@ internal class IndexState(
         }.toString()
 
     companion object {
+        /** The index of a board whose own was unreadable: the counter carries on from the journal that is left, or starts again. */
+        fun recovered(journal: String?): IndexState {
+            val seqs = Work.parseJournal(journal).map { it.seq }
+            val seq = seqs.maxOrNull() ?: 0L
+            return IndexState(seq, seqs.minOrNull() ?: (seq + 1))
+        }
+
+        fun decodeOrNull(text: String?): IndexState? =
+            try {
+                decode(text)
+            } catch (_: BoardException) {
+                null
+            }
+
         fun decode(text: String?): IndexState? {
             if (text == null) return null
             val o = stateObject(StateNames.INDEX, text)

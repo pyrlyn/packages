@@ -144,12 +144,21 @@ class ClaimTest {
     }
 
     @Test
-    fun aLivenessHookThatThrowsKeepsTheLease() {
+    fun aLivenessHookThatThrowsIsNoAnswerAndIsReportedOncePerCall() {
         val boom = Fixture(liveness = { error("registry down") })
         val a = boom.create("a").value.id
+        val b = boom.create("b").value.id
         boom.board.claim(a, "a1")
-        boom.clock.advance(31.minutes)
+        boom.board.claim(b, "a1")
+        boom.clock.advance(10.minutes)
         assertCode("claimed") { boom.board.claim(a, "a2") }
+        assertTrue(boom.warnings.isEmpty(), "an unexpired lease never asks the hook")
+        boom.clock.advance(21.minutes)
+        assertEquals("a1", boom.board.claim(a, "a2")!!.tookOverFrom)
+        assertEquals(1, boom.warnings.size)
+        boom.board.snapshot()
+        assertEquals(2, boom.warnings.size)
+        assertTrue(boom.warnings.all { it.startsWith("liveness hook failed") })
     }
 
     @Test

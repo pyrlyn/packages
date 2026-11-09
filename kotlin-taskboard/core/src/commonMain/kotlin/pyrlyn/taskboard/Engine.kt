@@ -1,6 +1,7 @@
 package pyrlyn.taskboard
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -18,18 +19,33 @@ internal class Engine(
     /** Whole seconds, the precision tasks keep on the wire, so what a write returns is what a read returns. */
     private fun now() = Instant.fromEpochSeconds(options.clock.now().epochSeconds)
 
+    /** The options of one call: the liveness hook cannot throw and reports through [diag]. */
+    private fun scoped(diag: Diag) = options.copy(liveness = diag.guard(options.liveness))
+
+    private fun readLeases(
+        r: Reader,
+        diag: Diag,
+    ) = diag.recover(StateNames.LEASES, { mutableMapOf() }) { State.decodeLeases(r.state(StateNames.LEASES)) }
+
+    private fun readIndex(
+        r: Reader,
+        diag: Diag,
+    ) = diag.recover(StateNames.INDEX, { IndexState.recovered(r.state(StateNames.JOURNAL)) }) { IndexState.decode(r.state(StateNames.INDEX)) ?: IndexState() }
+
     override fun snapshot(filter: Filter): BoardView {
+        val diag = Diag(options.warn)
+        val opts = scoped(diag)
         val r = store.snapshot()
         val now = now()
-        val leases = State.decodeLeases(r.state(StateNames.LEASES))
+        val leases = readLeases(r, diag)
         val tasks = r.tasks()
-        val ready = Ready.select(tasks.map { it.value }) { isStale(it, leases[it.id], now, options) }.map { it.task.id }.toSet()
-        val cards = tasks.map { card(it, leases[it.value.id], it.value.id in ready, now) }
+        val ready = Ready.select(tasks.map { it.value }) { isStale(it, leases[it.id], now, opts) }.map { it.task.id }.toSet()
+        val cards = tasks.map { card(it, leases[it.value.id], it.value.id in ready, now, opts) }
         val shown = cards.filter { matches(filter, it, ready) }
         return BoardView(
-            seq = IndexState.decode(r.state(StateNames.INDEX))?.seq ?: 0,
+            seq = readIndex(r, diag).seq,
             columns = Status.entries.map { s -> Column(s, shown.filter { it.status == s }.sortedWith(compareBy<Card> { it.priority }.thenBy { it.id })) },
-            warnings = r.warnings(),
+            warnings = r.warnings() + diag.messages,
         )
     }
 
@@ -38,6 +54,7 @@ internal class Engine(
         lease: Lease?,
         ready: Boolean,
         now: Instant,
+        opts: BoardOptions,
     ): Card {
         val t = v.value
         return Card(
@@ -51,7 +68,7 @@ internal class Engine(
             conflictsWith = t.conflictsWith,
             parallel = t.parallel,
             ready = ready,
-            stale = t.status.isActive && isStale(t, lease, now, options),
+            stale = t.status.isActive && isStale(t, lease, now, opts),
             lease = lease,
             rev = v.rev,
             remote = t.remote,
@@ -72,14 +89,15 @@ internal class Engine(
     override fun get(id: TaskId): Versioned<Task> = store.snapshot().tasks().firstOrNull { it.value.id == id } ?: throw BoardException(BoardError.NotFound(id.toString()))
 
     override fun show(id: TaskId): Shown {
+        val diag = Diag(options.warn)
         val r = store.snapshot()
         val tasks = r.tasks()
         val task = tasks.firstOrNull { it.value.id == id } ?: throw BoardException(BoardError.NotFound(id.toString()))
-        val lease = State.decodeLeases(r.state(StateNames.LEASES))[id]
+        val lease = readLeases(r, diag)[id]
         return Shown(
             task = task,
             lease = lease,
-            stale = task.value.status.isActive && isStale(task.value, lease, now(), options),
+            stale = task.value.status.isActive && isStale(task.value, lease, now(), scoped(diag)),
             subtasks = tasks.filter { it.value.parent == id }.map { it.value.id }.sorted(),
         )
     }
@@ -149,8 +167,9 @@ internal class Engine(
         val key = write.key
         if (key != null && (key.isBlank() || key.length > MAX_KEY)) invalid("an idempotency key is 1 to $MAX_KEY characters")
         val hash = sha256Hex(Codec.requestText(ops))
+        val diag = Diag(options.warn)
         return store.locked(options.lockTimeout) { session ->
-            val w = Work(session, options, now())
+            val w = Work(session, scoped(diag), now(), diag)
             w.reconcile()
             if (w.keys.entries.removeAll { w.now - it.value.at > options.keyTtl }) w.keysDirty = true
             val seen = key?.let { w.keys[it] }
@@ -185,10 +204,11 @@ internal class Engine(
         var r = store.snapshot()
         if (hasDrift(r)) {
             // Hand edits are journaled by whoever notices them first; a watcher counts, so a quiet board still reports them.
-            store.locked(options.lockTimeout) { s -> Work(s, options, now()).also { it.reconcile() }.commit() }
+            val diag = Diag(options.warn)
+            store.locked(options.lockTimeout) { s -> Work(s, scoped(diag), now(), diag).also { it.reconcile() }.commit() }
             r = store.snapshot()
         }
-        val index = IndexState.decode(r.state(StateNames.INDEX)) ?: IndexState()
+        val index = readIndex(r, Diag(options.warn))
         if (since < index.first - 1 || since > index.seq) return ChangePage(index.seq, emptyList(), reset = true)
         val entries =
             Work
@@ -200,7 +220,7 @@ internal class Engine(
     }
 
     private fun hasDrift(r: Reader): Boolean {
-        val index = IndexState.decode(r.state(StateNames.INDEX)) ?: return true
+        val index = IndexState.decodeOrNull(r.state(StateNames.INDEX)) ?: return true
         val tasks = r.tasks()
         return tasks.size != index.tasks.size || tasks.any { index.tasks[it.value.id]?.rev != it.rev }
     }
@@ -212,7 +232,7 @@ internal class Engine(
         flow {
             var cursor = since
             while (true) {
-                val page = withContext(Dispatchers.Default) { changes(cursor) }
+                val page = withContext(Dispatchers.IO) { changes(cursor) }
                 if (page.reset) {
                     emit(WatchEvent.Reset(page.seq))
                     cursor = page.seq

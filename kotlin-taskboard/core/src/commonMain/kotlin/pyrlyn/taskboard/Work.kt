@@ -12,21 +12,40 @@ internal class Work(
     private val session: Session,
     val options: BoardOptions,
     val now: Instant,
+    private val diag: Diag,
 ) {
     private val stored = session.tasks().associateBy { it.value.id }
     val tasks: MutableMap<TaskId, Task> = stored.mapValuesTo(LinkedHashMap()) { it.value.value }
     private val put = LinkedHashMap<TaskId, Task>()
 
     private var indexDirty = false
-    val index: IndexState = IndexState.decode(session.state(StateNames.INDEX)) ?: IndexState()
-    val leases = State.decodeLeases(session.state(StateNames.LEASES))
-    val counters = State.decodeCounters(session.state(StateNames.IDS))
-    val keys = State.decodeKeys(session.state(StateNames.KEYS))
-    val refs = mutableMapOf<String, TaskId>()
-
+    private var adopt = session.state(StateNames.INDEX) == null
+    val index: IndexState =
+        diag.recover(StateNames.INDEX, {
+            adopt = true
+            IndexState.recovered(session.state(StateNames.JOURNAL))
+        }) { IndexState.decode(session.state(StateNames.INDEX)) ?: IndexState() }
     var leasesDirty = false
+    val leases =
+        diag.recover(StateNames.LEASES, {
+            leasesDirty = true
+            mutableMapOf()
+        }) { State.decodeLeases(session.state(StateNames.LEASES)) }
     var countersDirty = false
+
+    // Numbers are re-derived from the highest id on the board, so a lost counter only forgets ids of deleted tasks.
+    val counters =
+        diag.recover(StateNames.IDS, {
+            countersDirty = true
+            mutableMapOf()
+        }) { State.decodeCounters(session.state(StateNames.IDS)) }
     var keysDirty = false
+    val keys =
+        diag.recover(StateNames.KEYS, {
+            keysDirty = true
+            mutableMapOf()
+        }) { State.decodeKeys(session.state(StateNames.KEYS)) }
+    val refs = mutableMapOf<String, TaskId>()
 
     /** Entries this session appended, for base-rev lookups that must see the batch's own earlier steps. */
     private val pending = mutableListOf<Change>()
@@ -34,8 +53,8 @@ internal class Work(
     private var journal: List<Change>? = null
 
     init {
-        // A board that predates the engine's index is adopted as it is, not reported as one big hand edit.
-        if (session.state(StateNames.INDEX) == null) {
+        // A board without a usable index is adopted as it is, not reported as one big hand edit.
+        if (adopt) {
             tasks.values.forEach { index.tasks[it.id] = IndexEntry(stored.getValue(it.id).rev, it.fieldValues()) }
             indexDirty = true
         }

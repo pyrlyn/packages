@@ -85,9 +85,9 @@ class CodecTest {
     @Test
     fun errorJsonCarriesTheStableCode() {
         val e = BoardError.Claimed(id("T1"), "a1", t0)
-        assertEquals("""{"code":"claimed","message":"T1 is claimed by a1 until 2023-11-14T22:13:20Z","data":{"id":"T1","holder":"a1","until":1700000000}}""", Codec.errorToJson(e).toString())
-        assertEquals("""{"code":"invalid","message":"x","data":null}""", Codec.errorToJson(BoardError.Invalid("x")).toString())
-        assertEquals("""{"code":"invalid","message":"x","data":{"op":2}}""", Codec.errorToJson(BoardError.Invalid("x"), opIndex = 2).toString())
+        assertEquals("""{"code":"claimed","message":"T1 is claimed by a1 until 2023-11-14T22:13:20Z","data":{"id":"T1","holder":"a1","until":1700000000}}""", Codec.errorToJson(BoardException(e)).toString())
+        assertEquals("""{"code":"invalid","message":"x","data":null}""", Codec.errorToJson(BoardException(BoardError.Invalid("x"))).toString())
+        assertEquals("""{"code":"invalid","message":"x","data":{"op":2}}""", Codec.errorToJson(BoardException(BoardError.Invalid("x"), 2)).toString())
         assertEquals(listOf("not_found", "conflict", "claimed", "invalid", "key_reused", "busy", "remote"), listOf(BoardError.NotFound("x"), conflict(), e, BoardError.Invalid("x"), BoardError.KeyReused("k"), BoardError.Busy(), BoardError.Remote("x")).map { it.code })
     }
 

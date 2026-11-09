@@ -120,6 +120,6 @@ internal fun isStale(
 ): Boolean {
     val holder = holderOf(task, lease) ?: return false
     if (lease != null && lease.expires > now) return false
-    // A liveness hook that throws must not lose anybody's task, so a failure counts as "alive".
-    return runCatching { options.liveness?.invoke(holder) }.fold({ it != true }, { false })
+    // The hook is wrapped per call (Diag.guard), so a failure already arrived here as "no answer".
+    return options.liveness?.invoke(holder) != true
 }
