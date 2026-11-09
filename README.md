@@ -10,6 +10,7 @@ checkout of this repository, found in a `packages/` directory above their own bu
 | [kotlin-fluent](kotlin-fluent) | Fluent UI components for Compose Multiplatform, without business logic |
 | [kotlin-glass](kotlin-glass) | Glass UI components for Compose Multiplatform, without business logic |
 | [kotlin-kit](kotlin-kit) | Small Kotlin/Native libraries: command lines, files, archives, TOML, YAML, semver, HTTP, SQLite, child processes |
+| [kotlin-macos](kotlin-macos) | macOS-style UI components for Compose Multiplatform, without business logic |
 | [kotlin-snapshot](kotlin-snapshot) | Snapshot assertions for Kotlin Multiplatform |
 | [kotlin-sync](kotlin-sync) | Sync contracts and the Kotlin client for the cloud sync |
 | [kotlin-taskboard](kotlin-taskboard) | The task board engine: model, store SPI and a board with an API for parallel clients that never conflict |
