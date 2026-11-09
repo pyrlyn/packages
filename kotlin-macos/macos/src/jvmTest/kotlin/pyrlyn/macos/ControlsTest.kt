@@ -1,6 +1,7 @@
 package pyrlyn.macos
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -10,13 +11,16 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runComposeUiTest
+import androidx.compose.ui.unit.dp
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 class ControlsTest {
@@ -36,6 +40,22 @@ class ControlsTest {
             onNodeWithTag("off").performClick()
             assertEquals(1, presses)
             onNodeWithTag("off").assertIsNotEnabled()
+        }
+
+    @Test
+    fun aSidebarRowPutsItsMetaAtTheEndOfTheTitleLine() =
+        runComposeUiTest {
+            setContent {
+                MacTheme {
+                    SidebarRow("Fix the login bug", "Claude · Working", Tone.Busy, false, {}, Modifier.width(240.dp), meta = "3m")
+                }
+            }
+            val title = onNodeWithText("Fix the login bug", useUnmergedTree = true).getUnclippedBoundsInRoot()
+            val subtitle = onNodeWithText("Claude · Working", useUnmergedTree = true).getUnclippedBoundsInRoot()
+            val meta = onNodeWithText("3m", useUnmergedTree = true).getUnclippedBoundsInRoot()
+            val middle = (meta.top + meta.bottom) / 2
+            assertTrue(middle > title.top && middle < title.bottom && middle < subtitle.top, "the meta sits on the title line")
+            assertTrue(meta.left >= title.right, "the meta follows the title")
         }
 
     @Test

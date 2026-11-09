@@ -37,7 +37,10 @@ fun SectionLabel(
     }
 }
 
-/** A sidebar item: a status dot, a title and the line under it. The dot's [tone] says the state; [subtitle] says it in words. */
+/**
+ * A sidebar item: a status dot, a title and the line under it. The dot's [tone] says the state; [subtitle] says it in words.
+ * [meta] is a short note at the end of the title line, such as how long ago the item last changed.
+ */
 @Composable
 fun SidebarRow(
     title: String,
@@ -46,12 +49,22 @@ fun SidebarRow(
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    meta: String? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     SelectableRow(selected, onClick, modifier, RoundedCornerShape(MacRadius.sm), MacSpace.sm) {
         StatusDot(tone)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(MacSpace.xxs)) {
-            Label(title, color = Mac.colors.textPrimary, style = if (selected) Mac.type.bodyEmphasized else Mac.type.body, maxLines = 1)
+            Row(horizontalArrangement = Arrangement.spacedBy(MacSpace.sm)) {
+                Label(
+                    title,
+                    Modifier.weight(1f).alignByBaseline(),
+                    Mac.colors.textPrimary,
+                    if (selected) Mac.type.bodyEmphasized else Mac.type.body,
+                    maxLines = 1,
+                )
+                meta?.let { Label(it, Modifier.alignByBaseline(), Mac.colors.textSecondary, Mac.type.caption, maxLines = 1) }
+            }
             Label(subtitle, color = Mac.colors.textSecondary, style = Mac.type.caption, maxLines = 1)
         }
         trailing?.invoke()
