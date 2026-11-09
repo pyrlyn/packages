@@ -18,6 +18,7 @@ pluginManagement {
     val sharedSettings = sharedBuild("shared-settings", "SHARED_SETTINGS_DIR")
     includeBuild(sharedSettings)
     includeBuild("$sharedSettings/settings-plugin")
+    extra["kotlinKitDir"] = sharedBuild("kotlin-kit", "KOTLIN_KIT_DIR")
 }
 
 plugins {
@@ -26,4 +27,7 @@ plugins {
 
 rootProject.name = "kotlin-taskboard"
 
-include(":core", ":testing")
+// The file store's file helpers, lock and YAML reader: a checkout of kotlin-kit.
+includeBuild(extra["kotlinKitDir"] as String)
+
+include(":core", ":testing", ":files")

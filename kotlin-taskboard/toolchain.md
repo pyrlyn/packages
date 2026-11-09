@@ -17,3 +17,5 @@
 | org.jetbrains.kotlin:kotlin-test | local (tests, `:testing`) | https://github.com/JetBrains/kotlin | Tests |
 | org.jlleitschuh.gradle.ktlint 14.2.0 (ktlint 1.8.0) | via shared-settings | https://github.com/JLLeitschuh/ktlint-gradle | Formatting lint |
 | dev.detekt 2.0.0-alpha.6 | via shared-settings | https://github.com/detekt/detekt | Static analysis |
+| pyrlyn.kit:fs | local (`:files`), included build `packages/kotlin-kit` (or `KOTLIN_KIT_DIR`) | https://github.com/pyrlyn/packages/tree/main/kotlin-kit | Crash-safe atomic writes, directory listing and the exclusive file lock `FileStore` takes |
+| pyrlyn.kit:yaml-aot | local (`:files`), included build `packages/kotlin-kit` (or `KOTLIN_KIT_DIR`) | https://github.com/pyrlyn/packages/tree/main/kotlin-kit | Reads task front matter and `YamlText.scalar` quotes the values written back |
