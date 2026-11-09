@@ -24,8 +24,10 @@ interface Reader {
 }
 
 /**
- * Everything one write needs to be applied as a single step. A store applies all of it or none of it, and a reader
- * never sees half of it.
+ * Everything one write needs to be applied as a single step. A store applies all of it or none of it, also across a
+ * crash: a file store keeps a redo log, and the next lock holder finishes what the crash interrupted. A file is never
+ * seen half written, but a reader that takes no lock may see a commit in progress, some of its files replaced and
+ * others not yet. A store that swaps the whole board in with one write, as an in-memory one does, may promise more.
  */
 data class Commit(
     /** Tasks to create or replace. */
@@ -48,8 +50,9 @@ interface Session : Reader {
     fun revOf(task: Task): Rev
 
     /**
-     * Applies [commit] all or nothing and returns the new rev of every task in `put`. A failure leaves the store as it
-     * was; a file store keeps a redo log so a crash does too.
+     * Applies [commit] all or nothing and returns the new rev of every task in `put`. A failure that happens before
+     * anything is written leaves the store as it was; a file store keeps a redo log, so a crash, or an error halfway,
+     * is finished by the next lock holder instead.
      */
     fun commit(commit: Commit): Map<TaskId, Rev>
 }
@@ -59,7 +62,10 @@ interface Session : Reader {
  * Boards on network file systems are not supported: a file store locks with flock.
  */
 interface Store {
-    /** A consistent read of the tasks and state without taking the lock; may lag a write in progress. */
+    /**
+     * A read of the tasks and state without taking the lock; it may lag a write in progress, or see one half applied
+     * (see [Commit]).
+     */
     fun snapshot(): Reader
 
     /**

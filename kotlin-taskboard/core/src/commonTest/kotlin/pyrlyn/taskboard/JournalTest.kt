@@ -189,4 +189,20 @@ class JournalTest {
             assertEquals(WatchEvent.Reset(21), events[0])
             assertEquals(22L, (events[1] as WatchEvent.Changed).change.seq)
         }
+
+    @Test
+    fun changesOnABoardNobodyWroteDoesNotWriteAnything() {
+        val page = board.changes(0)
+        assertTrue(page.changes.isEmpty())
+        assertEquals(0, f.store.commitCount)
+    }
+
+    @Test
+    fun anUnreadableIndexWithTasksStillCountsAsDrift() {
+        f.create("a")
+        f.store.corruptState("index", "{not json")
+        val before = f.store.commitCount
+        board.changes(0)
+        assertTrue(f.store.commitCount > before)
+    }
 }

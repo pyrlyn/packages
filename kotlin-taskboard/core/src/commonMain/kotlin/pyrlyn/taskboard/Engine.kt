@@ -220,8 +220,11 @@ internal class Engine(
     }
 
     private fun hasDrift(r: Reader): Boolean {
-        val index = IndexState.decodeOrNull(r.state(StateNames.INDEX)) ?: return true
+        val text = r.state(StateNames.INDEX)
         val tasks = r.tasks()
+        // A board nobody wrote yet has nothing to reconcile; taking the lock for it would create the board in a file store.
+        if (text == null && tasks.isEmpty()) return false
+        val index = IndexState.decodeOrNull(text) ?: return true
         return tasks.size != index.tasks.size || tasks.any { index.tasks[it.value.id]?.rev != it.rev }
     }
 
