@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -20,12 +21,15 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -212,5 +216,53 @@ fun HoverCard(
     ) {
         Icon(icon, tint = if (open) Mac.colors.textPrimary else tint)
         Menu(open, {}, Modifier.hoverable(onCard), width = width, focusable = false, content = content)
+    }
+}
+
+/**
+ * A button in two parts on a raised card: the main part runs [onClick], the chevron opens [menu] below it, as macOS's
+ * "Open in" pickers do. [menu] gets a function that closes it, for items that act and leave.
+ */
+@Composable
+fun SplitButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    menuDescription: String = "More",
+    menuWidth: Dp = MENU_WIDTH,
+    menu: @Composable ColumnScope.(close: () -> Unit) -> Unit,
+    content: @Composable RowScope.() -> Unit,
+) {
+    val c = Mac.colors
+    var open by remember { mutableStateOf(false) }
+    val main = remember { MutableInteractionSource() }
+    val more = remember { MutableInteractionSource() }
+    Box(modifier) {
+        Row(
+            Modifier
+                .height(MacSize.picker)
+                .raisedSurface(RoundedCornerShape(MacRadius.md))
+                .alpha(if (enabled) 1f else DISABLED_ALPHA),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                Modifier
+                    .fillMaxHeight()
+                    .control(RectangleShape, Color.Transparent, null, main, enabled, Role.Button, onClick)
+                    .padding(horizontal = MacSpace.lg),
+                horizontalArrangement = Arrangement.spacedBy(MacSpace.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) { ProvideMacContent(c.textPrimary, Mac.type.smallEmphasized) { content() } }
+            VerticalRule()
+            Box(
+                Modifier
+                    .fillMaxHeight()
+                    .semantics { contentDescription = menuDescription }
+                    .control(RectangleShape, c.bgFill, null, more, enabled, Role.DropdownList) { open = true }
+                    .padding(horizontal = MacSpace.md),
+                contentAlignment = Alignment.Center,
+            ) { Icon(MacIcon.ChevronDown, tint = c.textSecondary, size = CHEVRON) }
+        }
+        Menu(open, { open = false }, width = menuWidth) { menu { open = false } }
     }
 }

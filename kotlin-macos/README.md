@@ -30,7 +30,7 @@ MacTheme(MacColors.Dark) {
 | `Fields.kt` | `TextField`, `TextArea`, `SearchField`, `SearchButton` |
 | `Lists.kt` | `SectionLabel`, `SidebarRow`, `SettingsItem`, `Status`, `Toolbar`, `ListRow`, hairline modifiers |
 | `Surfaces.kt` | elevation modifiers, `Scrim`, `Sheet`, `SheetHeading`, `SheetButtons`, `Rule`, `IconTile`, `StatusDot`, `WindowControls` |
-| `Overlays.kt` | `Menu`, `MenuItem`, `MenuSection`, `MenuSeparator`, `HoverCard` |
+| `Overlays.kt` | `Menu`, `MenuItem`, `MenuSection`, `MenuSeparator`, `HoverCard`, `SplitButton` |
 | `Transcript.kt` | `Banner`, `Message`, `CommandCard`, `LabeledDivider`, `Disclosure`, `Composer` |
 
 The design file draws dark screens only; the light palette is derived from it. Compose has no vibrancy, so the

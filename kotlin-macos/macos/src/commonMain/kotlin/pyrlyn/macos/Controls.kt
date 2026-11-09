@@ -357,7 +357,7 @@ internal fun rowFill(
     }
 
 private val CHIP_DOT = 6.dp
-private val CHEVRON = 12.dp
+internal val CHEVRON = 12.dp
 private val KNOB = 14.dp
 private val KNOB_INSET = 2.dp
 private val CHEVRONS_WIDTH = 10.dp

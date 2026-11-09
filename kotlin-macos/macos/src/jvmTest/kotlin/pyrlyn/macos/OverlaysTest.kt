@@ -50,4 +50,30 @@ class OverlaysTest {
             onNodeWithContentDescription("Tokens").performMouseInput { exit() }
             onNodeWithText("12k sent").assertDoesNotExist()
         }
+
+    @Test
+    fun aSplitButtonRunsItsActionAndOpensItsMenu() =
+        runComposeUiTest {
+            val runs = mutableListOf<String>()
+            setContent {
+                MacTheme {
+                    SplitButton(
+                        { runs += "Finder" },
+                        menuDescription = "Open in",
+                        menu = { close ->
+                            MenuItem("Terminal", {
+                                runs += "Terminal"
+                                close()
+                            })
+                        },
+                    ) { Label("Open location") }
+                }
+            }
+            onNodeWithText("Open location").performClick()
+            onNodeWithText("Terminal").assertDoesNotExist()
+            onNodeWithContentDescription("Open in").performClick()
+            onNodeWithText("Terminal").performClick()
+            onNodeWithText("Terminal").assertDoesNotExist()
+            assertEquals(listOf("Finder", "Terminal"), runs)
+        }
 }
