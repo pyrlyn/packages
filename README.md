@@ -1,4 +1,4 @@
-# packages
+<h1><picture><source media="(prefers-color-scheme: dark)" srcset="brand/logo-dark.svg"><img src="brand/logo.svg" width="32" height="32" alt="" align="absmiddle"></picture> packages</h1>
 
 Shared Kotlin packages and Gradle build settings for the pyrlyn tools (Octo, rtok and others).
 Each directory is its own Gradle build; consumers include it as a Gradle included build from a
