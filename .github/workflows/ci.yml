@@ -74,7 +74,7 @@ jobs:
           expected=$(grep -A1 "<artifact name=\"$name\">" pyrlyn-kit/gradle/verification-metadata.xml | sed -n 's/.*sha256 value="\([0-9a-f]*\)".*/\1/p')
           [ -n "$expected" ] || { echo "no checksum for $name" >&2; exit 1; }
           url="https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-native-prebuilt/$version/$name"
-          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$name" "$url"
+          curl --proto '=https' --tlsv1.2 -fsSL --retry 3 -o "$RUNNER_TEMP/$name" "$url"
           echo "$expected  $RUNNER_TEMP/$name" | shasum -a 256 -c -
           mkdir -p "$HOME/.konan"
           tar -xzf "$RUNNER_TEMP/$name" -C "$HOME/.konan"
