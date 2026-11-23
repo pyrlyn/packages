@@ -60,6 +60,26 @@ jobs:
           key: konan-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packages/**/build.gradle.kts') }}
           restore-keys: konan-${{ runner.os }}-${{ runner.arch }}-
 
+      # pyrlyn-kit's conan script reads Kotlin/Native's konan.properties while Gradle creates the
+      # mingwX64 task, before the Kotlin Gradle plugin downloads Kotlin/Native, so a cold
+      # ~/.konan failed there. The archive comes from Maven Central, where the plugin fetches
+      # it too, checked against pyrlyn-kit/gradle/verification-metadata.xml.
+      - name: Fetch Kotlin/Native on a cold cache
+        working-directory: packages
+        run: |
+          version=$(sed -n 's/.*kotlin("multiplatform") version "\(.*\)".*/\1/p' pyrlyn-kit/build.gradle.kts)
+          name="kotlin-native-prebuilt-$version-macos-aarch64.tar.gz"
+          dist="$HOME/.konan/kotlin-native-prebuilt-macos-aarch64-$version"
+          [ -f "$dist/konan/konan.properties" ] && exit 0
+          expected=$(grep -A1 "<artifact name=\"$name\">" pyrlyn-kit/gradle/verification-metadata.xml | sed -n 's/.*sha256 value="\([0-9a-f]*\)".*/\1/p')
+          [ -n "$expected" ] || { echo "no checksum for $name" >&2; exit 1; }
+          url="https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-native-prebuilt/$version/$name"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$name" "$url"
+          echo "$expected  $RUNNER_TEMP/$name" | shasum -a 256 -c -
+          mkdir -p "$HOME/.konan"
+          tar -xzf "$RUNNER_TEMP/$name" -C "$HOME/.konan"
+          [ -f "$dist/konan/konan.properties" ] || { echo "konan.properties is not in $dist" >&2; exit 1; }
+
       # shared-settings has no wrapper of its own; pyrlyn-kit's (the same Gradle version) builds it.
       - name: Check
         working-directory: packages/${{ matrix.package }}
