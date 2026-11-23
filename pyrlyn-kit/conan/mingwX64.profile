@@ -24,12 +24,15 @@ tools.build:exelinkflags=["--target=x86_64-w64-mingw32", "--sysroot={{ sysroot }
 tools.build:sysroot={{ sysroot }}
 tools.cmake.cmaketoolchain:system_name=Windows
 tools.cmake.cmaketoolchain:system_processor=AMD64
+# XZ_NLS: xz_utils' CMake turns native language support on when it finds the build host's gettext (Homebrew's
+# libintl on a Mac), then refuses it for a mingw target; the library needs no translated messages.
 {% if windows %}
 # Windows has no make for CMake's default MinGW generator; Ninja comes from PATH, as CMake does.
 tools.cmake.cmaketoolchain:generator=Ninja
+tools.cmake.cmaketoolchain:extra_variables={"XZ_NLS": "OFF"}
 {% else %}
 # llvm-ar writes the symbol index itself; the host's ranlib would rewrite a COFF archive for its own format.
-tools.cmake.cmaketoolchain:extra_variables={"CMAKE_RANLIB": "true"}
+tools.cmake.cmaketoolchain:extra_variables={"CMAKE_RANLIB": "true", "XZ_NLS": "OFF"}
 {% endif %}
 
 [buildenv]
