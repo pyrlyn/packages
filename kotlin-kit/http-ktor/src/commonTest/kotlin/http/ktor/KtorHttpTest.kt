@@ -126,6 +126,43 @@ class KtorHttpTest {
             }
         }
 
+    @Test fun aStreamedPostSendsItsBodyAndReadsTheAnswerAsItComes() =
+        runBlocking {
+            var seen: io.ktor.client.request.HttpRequestData? = null
+            var sent = ""
+            val events = "data: {\"a\":1}\n\ndata: {\"a\":2}\n\n"
+            client { req ->
+                seen = req
+                sent = (req.body as io.ktor.http.content.OutgoingContent.ByteArrayContent).bytes().decodeToString()
+                respond(events, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/event-stream"))
+            }.use { c ->
+                val got =
+                    c.streamPost(HttpRequest("http://x/v1/audio/transcriptions", listOf("authorization" to "Bearer t"), "form".encodeToByteArray())) { head, body ->
+                        assertEquals("text/event-stream", head.header("content-type"))
+                        val out = StringBuilder()
+                        val buf = ByteArray(5)
+                        while (true) {
+                            val n = body.read(buf)
+                            if (n < 0) break
+                            out.append(buf.decodeToString(0, n))
+                        }
+                        out.toString()
+                    }
+                assertEquals(events, got)
+            }
+            assertEquals(HttpMethod.Post, seen!!.method)
+            assertEquals("Bearer t", seen.headers[HttpHeaders.Authorization])
+            assertEquals("form", sent)
+        }
+
+    @Test fun whatAStreamedPostHandlerThrowsPassesThroughUnchanged() =
+        runBlocking {
+            client { respond("body", HttpStatusCode.BadRequest) }.use { c ->
+                val e = assertFailsWith<IllegalStateException> { c.streamPost(HttpRequest("http://x/")) { head, _ -> error("status ${head.status}") } }
+                assertEquals("status 400", e.message)
+            }
+        }
+
     @Test fun aStreamGivesANonSuccessStatusToTheHandler() =
         runBlocking {
             client { respond("""{"message":"Not Found"}""", HttpStatusCode.NotFound) }.use { c ->
