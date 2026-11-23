@@ -5,7 +5,7 @@ Shared Gradle build settings, used as an included build from a checkout of [pyrl
 It lives in the workspace's `packages/`. Consumer `settings.gradle.kts` looks it up in every
 ancestor directory, so the build works from the main checkout and from a worktree nested deeper
 (for example `.rtok/worktrees/`); `SHARED_SETTINGS_DIR` points elsewhere. Other shared builds in
-`packages/` (such as `kotlin-wasm`) are found the same way:
+`packages/` (such as `pyrlyn-wasm`) are found the same way:
 
 ```kotlin
 pluginManagement {
@@ -20,12 +20,12 @@ pluginManagement {
     val sharedSettings = sharedBuild("shared-settings", "SHARED_SETTINGS_DIR")
     includeBuild(sharedSettings)
     includeBuild("$sharedSettings/settings-plugin")
-    extra["kotlinWasmDir"] = sharedBuild("kotlin-wasm", "KOTLIN_WASM_DIR")
+    extra["pyrlynWasmDir"] = sharedBuild("pyrlyn-wasm", "KOTLIN_WASM_DIR")
 }
 
 plugins { id("shared.settings") }
 
-includeBuild(extra["kotlinWasmDir"] as String)
+includeBuild(extra["pyrlynWasmDir"] as String)
 ```
 
 `includeBuild` inside `pluginManagement` takes a `String`: a `File` silently resolves to the outer
