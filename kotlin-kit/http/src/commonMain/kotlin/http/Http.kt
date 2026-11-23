@@ -72,6 +72,15 @@ interface HttpClient : AutoCloseable {
         req: HttpRequest,
         handle: suspend (HttpHead, HttpBody) -> T,
     ): T = throw HttpException(HttpException.Kind.Io, "streaming is not supported by this client")
+
+    /**
+     * POST [req] and hand the head and the unread body to [handle], as [stream] does for a GET: for an answer that comes
+     * as it is made (server-sent events) or one too large to trust whole.
+     */
+    suspend fun <T> streamPost(
+        req: HttpRequest,
+        handle: suspend (HttpHead, HttpBody) -> T,
+    ): T = throw HttpException(HttpException.Kind.Io, "streaming a POST is not supported by this client")
 }
 
 /** Builds clients; the composition root picks the engine adapter. */

@@ -16,8 +16,10 @@ import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
 import io.ktor.client.request.prepareGet
+import io.ktor.client.request.prepareRequest
 import io.ktor.client.request.request
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpStatement
 import io.ktor.client.statement.bodyAsBytes
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.HttpMethod
@@ -72,10 +74,28 @@ class KtorHttp(
     override suspend fun <T> stream(
         req: HttpRequest,
         handle: suspend (HttpHead, HttpBody) -> T,
+    ): T = streamed(req, handle) { client.prepareGet(req.url) { req.headers.forEach { (k, v) -> headers.append(k, v) } } }
+
+    override suspend fun <T> streamPost(
+        req: HttpRequest,
+        handle: suspend (HttpHead, HttpBody) -> T,
+    ): T =
+        streamed(req, handle) {
+            client.prepareRequest(req.url) {
+                method = HttpMethod.Post
+                req.headers.forEach { (k, v) -> headers.append(k, v) }
+                setBody(req.body)
+            }
+        }
+
+    private suspend fun <T> streamed(
+        req: HttpRequest,
+        handle: suspend (HttpHead, HttpBody) -> T,
+        prepare: suspend () -> HttpStatement,
     ): T =
         try {
             mapped(req) {
-                client.prepareGet(req.url) { req.headers.forEach { (k, v) -> headers.append(k, v) } }.execute { resp ->
+                prepare().execute { resp ->
                     val head = HttpHead(resp.status.value, resp.headers.entries().flatMap { (k, vs) -> vs.map { k to it } })
                     val channel = resp.bodyAsChannel()
                     val body = HttpBody { buffer -> mapped(req) { channel.readAvailable(buffer, 0, buffer.size) } }
