@@ -5,7 +5,26 @@ package process
 /** The read end of a child's stdout or stderr. */
 internal interface Source {
     /** Bytes read into [buf]: positive, 0 at end of file, negative when interrupted and to be read again. */
-    fun read(buf: ByteArray): Int
+    fun read(buf: ByteArray): Int = read(buf, 0, buf.size)
+
+    /** As [read], into at most [count] bytes of [buf] from [offset]. */
+    fun read(
+        buf: ByteArray,
+        offset: Int,
+        count: Int,
+    ): Int
+
+    fun close()
+}
+
+/** The write end of a child's stdin. */
+internal interface Sink {
+    /** Bytes of [buf] from [offset] written, at least one; negative once the child has closed its end. */
+    fun write(
+        buf: ByteArray,
+        offset: Int,
+        count: Int,
+    ): Int
 
     fun close()
 }
@@ -44,10 +63,14 @@ internal class Piped(
     val child: Child,
     val out: Source,
     val err: Source,
+    val input: Sink? = null,
 )
 
 /** Start [command] with stdin from its file or an empty one and both outputs piped, apart from this console. */
 internal expect fun spawnPiped(command: Command): Piped
+
+/** Start [command] with all three std streams piped, apart from this console, in a group (or job) of its own. */
+internal expect fun spawnPipes(command: Command): Piped
 
 /** Start [command] sharing this process's stdin, stdout, stderr and console. */
 internal expect fun spawnInherited(command: Command): Child

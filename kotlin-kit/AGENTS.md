@@ -15,7 +15,7 @@ does the work, one adapter module:
 - `:http` (interface) and `:http-ktor` (Ktor client).
 - `:db` (interface), `:db-room` (androidx.sqlite, bundled SQLite; macOS and Linux) and `:db-native` (SQLite's C API
   from Conan; Windows); `:db-testing` holds the checks both adapters' tests run.
-- `:process`, child processes under a deadline over `posix_spawn` or CreateProcessW and a job object (no third-party
+- `:process`, child processes under a deadline, or long-lived ones over three pipes, over `posix_spawn` or CreateProcessW and a job object (no third-party
   library).
 
 Consumers program against the interfaces, so swapping an engine never touches them.

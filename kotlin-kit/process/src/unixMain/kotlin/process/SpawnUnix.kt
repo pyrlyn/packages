@@ -40,9 +40,12 @@ import platform.posix.usleep
 import platform.posix.waitpid
 import process.spawn.kit_environ
 import process.spawn.kit_exe_path
+import process.spawn.kit_nosigpipe
 import process.spawn.kit_pipe
 import process.spawn.kit_spawn
+import process.spawn.kit_spawn_fds
 import process.spawn.kit_spawn_inherit
+import process.spawn.kit_write
 import kotlin.time.TimeSource
 
 /** Longest executable path [currentExe] reads; `PATH_MAX` on Linux and macOS alike. */
@@ -52,10 +55,28 @@ private const val MICROS_PER_MILLI = 1000
 private class FdSource(
     val fd: Int,
 ) : Source {
-    override fun read(buf: ByteArray): Int {
-        val n = buf.usePinned { read(fd, it.addressOf(0), buf.size.convert()) }.toInt()
+    override fun read(
+        buf: ByteArray,
+        offset: Int,
+        count: Int,
+    ): Int {
+        val n = buf.usePinned { read(fd, it.addressOf(offset), count.convert()) }.toInt()
         return if (n < 0 && errno == EINTR) -1 else maxOf(n, 0)
     }
+
+    override fun close() {
+        close(fd)
+    }
+}
+
+private class FdSink(
+    val fd: Int,
+) : Sink {
+    override fun write(
+        buf: ByteArray,
+        offset: Int,
+        count: Int,
+    ): Int = buf.usePinned { kit_write(fd, it.addressOf(offset), count.convert()) }.toInt()
 
     override fun close() {
         close(fd)
@@ -127,6 +148,36 @@ internal actual fun spawnPiped(command: Command): Piped =
             throw cannotRun(command, osError(rc))
         }
         Piped(PosixChild(pid.value, command.program), FdSource(outPipe[0]), FdSource(errPipe[0]))
+    }
+
+internal actual fun spawnPipes(command: Command): Piped =
+    memScoped {
+        val pipes = List(3) { allocArray<IntVar>(2) }
+        pipes.forEachIndexed { i, pipe ->
+            val rc = kit_pipe(pipe)
+            if (rc != 0) {
+                pipes.take(i).forEach {
+                    close(it[0])
+                    close(it[1])
+                }
+                throw cannotRun(command, osError(rc))
+            }
+        }
+        val (inPipe, outPipe, errPipe) = pipes
+        kit_nosigpipe(inPipe[1])
+        val pid = alloc<IntVar>()
+        val rc = kit_spawn_fds(pid.ptr, command.program, argv(command), envp(command), command.dir, null, inPipe[0], outPipe[1], errPipe[1])
+        // The child has its copies; keeping them would hide its end of file from both sides.
+        close(inPipe[0])
+        close(outPipe[1])
+        close(errPipe[1])
+        if (rc != 0) {
+            close(inPipe[1])
+            close(outPipe[0])
+            close(errPipe[0])
+            throw cannotRun(command, osError(rc))
+        }
+        Piped(PosixChild(pid.value, command.program), FdSource(outPipe[0]), FdSource(errPipe[0]), FdSink(inPipe[1]))
     }
 
 internal actual fun spawnInherited(command: Command): Child =

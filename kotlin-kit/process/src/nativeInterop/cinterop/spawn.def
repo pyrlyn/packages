@@ -2,7 +2,7 @@
 # not export on macOS. The spawn
 # set-up is done here in C because posix_spawn's types are a pointer on macOS and a struct on Linux, and Kotlin code
 # shared by both sees only what the two have in common.
-headers = spawn.h signal.h fcntl.h unistd.h
+headers = spawn.h signal.h fcntl.h unistd.h pthread.h time.h
 # Only the kit_* helpers below are bound; the headers are there for them.
 headerFilter = kit-none
 package = process.spawn
@@ -55,12 +55,12 @@ static inline int kit_pipe(int fds[2]) {
 }
 
 /*
- * Spawn `program` (looked up on PATH) with stdin on `in_path` (/dev/null when it is null), stdout and stderr on the
- * given pipe ends, in `dir` when it is not null, as the leader of its own process group, with SIGPIPE at its default and no signal blocked,
- * as Rust's Command starts a child. Returns 0 or the errno.
+ * Spawn `program` (looked up on PATH) with stdin on `in_fd` when it is not negative, else on `in_path` (/dev/null when
+ * it is null), stdout and stderr on the given pipe ends, in `dir` when it is not null, as the leader of its own process
+ * group, with SIGPIPE at its default and no signal blocked, as Rust's Command starts a child. Returns 0 or the errno.
  */
-static inline int kit_spawn(int *pid, const char *program, char *const argv[], char *const envp[], const char *dir,
-                            const char *in_path, int out_fd, int err_fd) {
+static inline int kit_spawn_fds(int *pid, const char *program, char *const argv[], char *const envp[], const char *dir,
+                                const char *in_path, int in_fd, int out_fd, int err_fd) {
     posix_spawn_file_actions_t actions;
     posix_spawnattr_t attr;
     sigset_t defaults, mask;
@@ -71,8 +71,9 @@ static inline int kit_spawn(int *pid, const char *program, char *const argv[], c
         posix_spawn_file_actions_destroy(&actions);
         return rc;
     }
-    /* A file or nothing, never this process's stdin: a child waiting on input would sit out the deadline. */
-    rc = posix_spawn_file_actions_addopen(&actions, 0, in_path ? in_path : "/dev/null", O_RDONLY, 0);
+    /* A pipe, a file or nothing, never this process's stdin: a child waiting on input would sit out the deadline. */
+    if (in_fd >= 0) rc = posix_spawn_file_actions_adddup2(&actions, in_fd, 0);
+    else rc = posix_spawn_file_actions_addopen(&actions, 0, in_path ? in_path : "/dev/null", O_RDONLY, 0);
     if (!rc) rc = posix_spawn_file_actions_adddup2(&actions, out_fd, 1);
     if (!rc) rc = posix_spawn_file_actions_adddup2(&actions, err_fd, 2);
     if (!rc && dir) rc = kit_addchdir(&actions, dir);
@@ -90,6 +91,51 @@ static inline int kit_spawn(int *pid, const char *program, char *const argv[], c
     posix_spawnattr_destroy(&attr);
     posix_spawn_file_actions_destroy(&actions);
     return rc;
+}
+
+static inline int kit_spawn(int *pid, const char *program, char *const argv[], char *const envp[], const char *dir,
+                            const char *in_path, int out_fd, int err_fd) {
+    return kit_spawn_fds(pid, program, argv, envp, dir, in_path, -1, out_fd, err_fd);
+}
+
+/*
+ * The write end of a child's stdin pipe: a write after the child is gone must fail with EPIPE, not raise SIGPIPE and
+ * end this process. macOS can say so on the descriptor; Linux cannot, so kit_write blocks the signal around the call.
+ */
+static inline void kit_nosigpipe(int fd) {
+#ifdef __APPLE__
+    fcntl(fd, F_SETNOSIGPIPE, 1);
+#else
+    (void)fd;
+#endif
+}
+
+/*
+ * Write up to `n` bytes to a pipe, retrying an interrupted call: the count written, or minus the errno (-EPIPE once
+ * the reader is gone). On Linux SIGPIPE is blocked on this thread for the call, and the one the write raised is taken
+ * back before it is unblocked, unless one was already pending for another reason.
+ */
+static inline long kit_write(int fd, const void *buf, long n) {
+    ssize_t w;
+#ifdef __APPLE__
+    do w = write(fd, buf, (size_t)n); while (w < 0 && errno == EINTR);
+    return w < 0 ? -(long)errno : (long)w;
+#else
+    sigset_t pipe_only, old, pending;
+    sigemptyset(&pipe_only);
+    sigaddset(&pipe_only, SIGPIPE);
+    pthread_sigmask(SIG_BLOCK, &pipe_only, &old);
+    sigpending(&pending);
+    int was_pending = sigismember(&pending, SIGPIPE);
+    do w = write(fd, buf, (size_t)n); while (w < 0 && errno == EINTR);
+    int e = errno;
+    if (w < 0 && e == EPIPE && !was_pending) {
+        struct timespec now = {0, 0};
+        while (sigtimedwait(&pipe_only, NULL, &now) < 0 && errno == EINTR) {}
+    }
+    pthread_sigmask(SIG_SETMASK, &old, NULL);
+    return w < 0 ? -(long)e : (long)w;
+#endif
 }
 
 /*
