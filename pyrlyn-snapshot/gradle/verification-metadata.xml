@@ -4,8 +4,6 @@
       <verify-metadata>true</verify-metadata>
       <verify-signatures>false</verify-signatures>
       <trusted-artifacts>
-         <!-- Host-specific downloads: the checksums below were written on macOS arm64 (the CI host);
-              the Linux and Windows variants of the same versions are trusted by name. -->
          <trust group="build.buf" name="buf" file="buf-.*-(linux|windows)-.*" regex="true"/>
          <trust group="org.jetbrains.compose.desktop" name="desktop-jvm-(linux|windows)-.*" regex="true"/>
          <trust group="org.jetbrains.kotlin" name="kotlin-native-prebuilt" file=".*-(linux|windows)-.*" regex="true"/>
