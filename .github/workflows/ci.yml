@@ -1,0 +1,68 @@
+# The gate of every package: `./gradlew check` (compile, the host's tests, ktlint, detekt) as each
+# package's AGENTS.md defines it, one job per Gradle build. macOS arm64 is the host every package
+# targets and the one gradle/verification-metadata.xml was written on. The checkout goes to
+# `packages/`, where each build looks for its sibling builds (shared-settings, pyrlyn-kit, ...).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: check (${{ matrix.package }})
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: macos-15
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - shared-settings
+          - pyrlyn-adwaita
+          - pyrlyn-fluent
+          - pyrlyn-glass
+          - pyrlyn-kit
+          - pyrlyn-macos
+          - pyrlyn-snapshot
+          - pyrlyn-sync
+          - pyrlyn-taskboard
+          - pyrlyn-wasm
+          - pyrlyn-webgl
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: packages
+          persist-credentials: false
+
+      - name: Install the JDK and Conan (mise.toml)
+        uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
+        with:
+          working_directory: packages
+
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+
+      - name: Cache the Kotlin/Native toolchain
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packages/**/build.gradle.kts') }}
+          restore-keys: konan-${{ runner.os }}-${{ runner.arch }}-
+
+      # shared-settings has no wrapper of its own; pyrlyn-kit's (the same Gradle version) builds it.
+      - name: Check
+        working-directory: packages/${{ matrix.package }}
+        run: |
+          if [ -x ./gradlew ]; then gradle=./gradlew; else gradle="../pyrlyn-kit/gradlew -p ."; fi
+          $gradle check --console=plain
