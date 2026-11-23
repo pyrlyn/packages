@@ -42,16 +42,22 @@ import process.spawnwin.kit_read
 import process.spawnwin.kit_spawn_detached
 import process.spawnwin.kit_spawn_inherit
 import process.spawnwin.kit_spawn_piped
+import process.spawnwin.kit_spawn_pipes
 import process.spawnwin.kit_wait
+import process.spawnwin.kit_write
 
 private class PipeSource(
     val handle: HANDLE,
 ) : Source {
     /** A broken pipe is the end of file: the child, and everything holding the write end, is gone. */
-    override fun read(buf: ByteArray): Int =
+    override fun read(
+        buf: ByteArray,
+        offset: Int,
+        count: Int,
+    ): Int =
         memScoped {
             val got = alloc<DWORDVar>()
-            val rc = buf.usePinned { kit_read(handle, it.addressOf(0), buf.size.convert(), got.ptr) }
+            val rc = buf.usePinned { kit_read(handle, it.addressOf(offset), count.convert(), got.ptr) }
             if (rc == 0u) got.value.toInt() else 0
         }
 
@@ -60,6 +66,25 @@ private class PipeSource(
         memScoped {
             val n = alloc<DWORDVar>()
             if (kit_peek(handle, n.ptr) == 0u) n.value.toLong() else -1
+        }
+
+    override fun close() {
+        CloseHandle(handle)
+    }
+}
+
+private class PipeSink(
+    val handle: HANDLE,
+) : Sink {
+    override fun write(
+        buf: ByteArray,
+        offset: Int,
+        count: Int,
+    ): Int =
+        memScoped {
+            val put = alloc<DWORDVar>()
+            val rc = buf.usePinned { kit_write(handle, it.addressOf(offset), count.convert(), put.ptr) }
+            if (rc == 0u) put.value.toInt() else -1
         }
 
     override fun close() {
@@ -119,6 +144,16 @@ internal actual fun spawnPiped(command: Command): Piped =
         if (rc != 0u) throw cannotRun(command, osError(rc.toInt()))
         val process = WinChild(child.process!!, child.job, child.pid.toInt(), command.program)
         Piped(process, PipeSource(child.out!!), PipeSource(child.err!!))
+    }
+
+internal actual fun spawnPipes(command: Command): Piped =
+    memScoped {
+        val launch = launchOf(command)
+        val child = alloc<kit_child>()
+        val rc = kit_spawn_pipes(launch.application, launch.commandLine.wcstr.ptr, envBlock(command), command.dir, child.ptr)
+        if (rc != 0u) throw cannotRun(command, osError(rc.toInt()))
+        val process = WinChild(child.process!!, child.job, child.pid.toInt(), command.program)
+        Piped(process, PipeSource(child.out!!), PipeSource(child.err!!), PipeSink(child.`in`!!))
     }
 
 internal actual fun spawnInherited(command: Command): Child =

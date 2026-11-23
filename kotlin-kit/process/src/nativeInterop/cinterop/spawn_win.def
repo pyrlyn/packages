@@ -9,6 +9,7 @@ package = process.spawnwin
 typedef struct {
     HANDLE process;
     HANDLE job;
+    HANDLE in;
     HANDLE out;
     HANDLE err;
     DWORD pid;
@@ -28,17 +29,19 @@ static HANDLE kit_open_stdin(LPCWSTR path) {
     return h == INVALID_HANDLE_VALUE ? NULL : h;
 }
 
-/* A pipe whose write end the child inherits and whose read end stays ours alone. */
-static BOOL kit_pipe(HANDLE* read, HANDLE* write) {
+/* A pipe whose write end the child inherits and whose read end stays ours alone, or the other way round for stdin. */
+static BOOL kit_pipe_for(HANDLE* read, HANDLE* write, BOOL child_reads) {
     SECURITY_ATTRIBUTES sa = { sizeof(sa), NULL, TRUE };
     if (!CreatePipe(read, write, &sa, 0)) return FALSE;
-    if (SetHandleInformation(*read, HANDLE_FLAG_INHERIT, 0)) return TRUE;
+    if (SetHandleInformation(child_reads ? *write : *read, HANDLE_FLAG_INHERIT, 0)) return TRUE;
     DWORD e = GetLastError();
     CloseHandle(*read);
     CloseHandle(*write);
     SetLastError(e);
     return FALSE;
 }
+
+static BOOL kit_pipe(HANDLE* read, HANDLE* write) { return kit_pipe_for(read, write, FALSE); }
 
 /* A copy of one of our own std handles the child may inherit; NULL when there is none. */
 static HANDLE kit_inheritable(DWORD which) {
@@ -153,6 +156,39 @@ static DWORD kit_spawn_piped(LPCWSTR app, LPWSTR cmdline, LPVOID env, LPCWSTR di
     return 0;
 }
 
+/*
+ * The long-lived child: all three std handles are pipes, the rest as for the bounded child. Its stdin is ours to write
+ * and to close, which is how it learns there is no more.
+ */
+static DWORD kit_spawn_pipes(LPCWSTR app, LPWSTR cmdline, LPVOID env, LPCWSTR dir, kit_child* child) {
+    HANDLE in_r = NULL, in_w = NULL, out_r = NULL, out_w = NULL, err_r = NULL, err_w = NULL, job = NULL;
+    if (!kit_pipe_for(&in_r, &in_w, TRUE)) return GetLastError();
+    if (!kit_pipe(&out_r, &out_w)) { HANDLE c[] = { in_r, in_w }; return kit_fail(c, 2); }
+    if (!kit_pipe(&err_r, &err_w)) { HANDLE c[] = { in_r, in_w, out_r, out_w }; return kit_fail(c, 4); }
+    if (!(job = kit_job())) { HANDLE c[] = { in_r, in_w, out_r, out_w, err_r, err_w }; return kit_fail(c, 6); }
+    HANDLE std[3] = { in_r, out_w, err_w };
+    HANDLE process = NULL;
+    DWORD pid = 0;
+    DWORD rc = kit_create(app, cmdline, env, dir, CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP, std, job, &process, &pid);
+    CloseHandle(in_r);
+    CloseHandle(out_w);
+    CloseHandle(err_w);
+    if (rc != 0) {
+        CloseHandle(in_w);
+        CloseHandle(out_r);
+        CloseHandle(err_r);
+        CloseHandle(job);
+        return rc;
+    }
+    child->process = process;
+    child->job = job;
+    child->in = in_w;
+    child->out = out_r;
+    child->err = err_r;
+    child->pid = pid;
+    return 0;
+}
+
 /* The interactive child: our own std handles and console, no job, nothing captured. */
 static DWORD kit_spawn_inherit(LPCWSTR app, LPWSTR cmdline, LPVOID env, LPCWSTR dir, kit_child* child) {
     HANDLE std[3] = { kit_inheritable(STD_INPUT_HANDLE), kit_inheritable(STD_OUTPUT_HANDLE), kit_inheritable(STD_ERROR_HANDLE) };
@@ -204,6 +240,11 @@ static DWORD kit_peek(HANDLE pipe, DWORD* available) {
 
 static DWORD kit_read(HANDLE pipe, void* buf, DWORD size, DWORD* got) {
     return ReadFile(pipe, buf, size, got, NULL) ? 0 : GetLastError();
+}
+
+/* ERROR_BROKEN_PIPE or ERROR_NO_DATA once the child has closed its end. */
+static DWORD kit_write(HANDLE pipe, const void* buf, DWORD size, DWORD* put) {
+    return WriteFile(pipe, buf, size, put, NULL) ? 0 : GetLastError();
 }
 
 /* The job reaches a grandchild whose parent has already exited, which a walk of parent ids cannot find. */
