@@ -1,0 +1,8 @@
+# Tool pins for mise users (https://mise.jdx.dev/) and CI. Gradle comes from each package's wrapper
+# and Kotlin/Native from the Kotlin Gradle plugin; mise provides the JDK and what pyrlyn-kit's
+# Conan installs need (pyrlyn-kit/toolchain.md).
+[tools]
+java = "temurin-21" # runs Gradle and the Kotlin/Native compiler
+python = "3.15.2" # runs Conan
+uv = "0.13.9" # installs Conan into the Python above
+conan = "2.33.0" # the version pyrlyn-kit's conan.lock files were made with

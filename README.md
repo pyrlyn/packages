@@ -19,3 +19,23 @@ checkout of this repository, found in a `packages/` directory above their own bu
 | [shared-settings](shared-settings) | Shared Gradle build settings: ktlint, detekt, Kotlin/Native, repositories, build cache |
 
 Each package keeps its own README, AGENTS.md and plan.
+
+## Checks
+
+CI (`.github/workflows/ci.yml`) runs `./gradlew check` in every package on macOS arm64; `mise.toml`
+pins the JDK and the Conan that pyrlyn-kit needs.
+
+## Dependency verification
+
+Each package's `gradle/verification-metadata.xml` holds the SHA-256 of every file its build
+downloads (plugins, libraries, Kotlin/Native, Node.js), so a changed or substituted artifact fails
+the build. Gradle reads it only when the package is the root build: a consumer that includes a
+package verifies with its own file. The checksums were written on macOS arm64; the Linux and
+Windows variants of the host-specific downloads are trusted by name. After changing a dependency,
+rewrite the file from that package's directory:
+
+```sh
+./gradlew --write-verification-metadata sha256 check
+```
+
+(`shared-settings` has no wrapper: `../pyrlyn-kit/gradlew -p . --write-verification-metadata sha256 build`.)
